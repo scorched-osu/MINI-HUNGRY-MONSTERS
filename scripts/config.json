@@ -5,9 +5,12 @@
 
   "initialMhmHolders": [
     {
-      "$comment": "Initial MHM allocation minted at launch. amountMhm is a PLACEHOLDER — adjust before running initialize, and add one entry per additional holder wallet.",
       "address": "CzkwjAD9ADyeQujGQViCkJjhNAswuimgbXmtP7gE4nBG",
       "amountMhm": 1000000
+    },
+    {
+      "address": "6UYidbhppbFHRMYfeM6cM1cyvhZFrpGYJLJYz9FQMWMB",
+      "amountMhm": 500000
     }
   ],
 
