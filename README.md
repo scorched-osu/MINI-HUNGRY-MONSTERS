@@ -88,6 +88,42 @@ anchor test           # spins up a localnet and runs tests/mhm-game.ts
 cargo test -p mhm-game --lib   # combat engine unit tests (no validator needed)
 ```
 
+## Local playtest (see the game in a browser)
+
+```bash
+# 0. One-time: wallet + point the CLI at localnet
+solana-keygen new --no-bip39-passphrase   # skip if you already have one
+solana config set --url localhost
+
+# 1. Make the program id YOURS (first build generates a keypair; sync
+#    rewrites declare_id + Anchor.toml to match, then rebuild)
+anchor build && anchor keys sync && anchor build
+
+# 2. Terminal 2: local validator
+solana-test-validator
+
+# 3. Deploy + initialize (fund your CLI wallet first)
+solana airdrop 10
+anchor deploy
+npm install
+# TIP: for a fun demo, crank miningRateRangesMhmPerHour way up in
+# scripts/config.json (e.g. "standard": [3600, 7200]) before this step:
+ANCHOR_PROVIDER_URL=http://127.0.0.1:8899 ANCHOR_WALLET=~/.config/solana/id.json \
+npm run initialize
+
+# 4. Refresh the IDL the app uses (program id changed in step 1!)
+anchor idl build --program-name mhm_game -o app/src/idl/mhm_game.json
+
+# 5. Run the app
+cd app && npm install && npm run dev    # http://localhost:5173
+```
+
+In Phantom: Settings → Developer Settings → enable Testnet Mode and select
+**Localhost**, then fund it: `solana airdrop 5 <your-phantom-address>`.
+Connect, hatch a monster, watch it mine. To try a battle you need a second
+wallet (second browser profile, or Solflare) with its own SOL + monster —
+open a battle from one, join and fight from the other.
+
 ### Deploying & initializing
 
 ```bash

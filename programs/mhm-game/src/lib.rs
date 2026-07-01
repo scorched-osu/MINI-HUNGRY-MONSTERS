@@ -313,6 +313,12 @@ pub mod mhm_game {
         let monster = &mut ctx.accounts.monster;
         require!(!monster.in_battle, MhmError::MonsterInBattle);
         require!(monster.mint != battle.monsters[0], MhmError::CannotBattleSelf);
+        // Same wallet on both sides would make turn submission ambiguous
+        // (players are identified by wallet).
+        require!(
+            ctx.accounts.joiner.key() != battle.players[0],
+            MhmError::CannotBattleSelf
+        );
 
         monster.settle(now);
         let pot = monster.unclaimed;
