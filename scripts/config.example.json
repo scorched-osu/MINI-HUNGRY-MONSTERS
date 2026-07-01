@@ -1,0 +1,36 @@
+{
+  "$comment": "Copy to scripts/config.json and fill in YOUR wallet addresses before running `npm run initialize`. All MHM amounts are in micro-MHM (1 MHM = 1000000).",
+
+  "feeWallet": "REPLACE_WITH_YOUR_FEE_RECIPIENT_WALLET_ADDRESS",
+
+  "initialMhmHolders": [
+    {
+      "$comment": "Wallets that receive an initial MHM allocation at launch (team / treasury / liquidity). Add one entry per holder wallet.",
+      "address": "REPLACE_WITH_HOLDER_WALLET_ADDRESS",
+      "amountMhm": 1000000
+    }
+  ],
+
+  "burnBps": 7000,
+  "battleFeeBps": 250,
+  "monsterPriceMhm": 100000000,
+  "genesisPriceLamports": 100000000,
+  "genesisRemaining": 1000,
+
+  "miningRateRangesMhmPerHour": {
+    "$comment": "PLACEHOLDER values (in whole MHM per hour) pending the mining-speed discussion. Tunable later via update_config without redeploying.",
+    "standard": [0.1, 1],
+    "rare": [1, 3],
+    "epic": [3, 7],
+    "legendary": [7, 13],
+    "unique": [13, 21]
+  },
+
+  "rarityWeightsBps": {
+    "standard": 6000,
+    "rare": 2500,
+    "epic": 1000,
+    "legendary": 400,
+    "unique": 100
+  }
+}
