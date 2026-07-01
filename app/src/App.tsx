@@ -8,6 +8,7 @@ import {
   claimMining,
   createBattle,
   fetchAllBattles,
+  fetchAllListings,
   fetchAllMonsters,
   fetchConfig,
   fetchHeldMints,
@@ -19,12 +20,14 @@ import {
   type Battle,
   type GameConfig,
   type Keyed,
+  type Listing,
   type Monster,
 } from './game'
 import { MonsterCard } from './MonsterCard'
 import { Arena } from './Arena'
+import { Market } from './Market'
 
-type Tab = 'monsters' | 'hatchery' | 'arena'
+type Tab = 'monsters' | 'hatchery' | 'arena' | 'market'
 
 export default function App() {
   const { connection } = useConnection()
@@ -41,6 +44,7 @@ export default function App() {
   const [monsters, setMonsters] = useState<Keyed<Monster>[]>([])
   const [held, setHeld] = useState<Set<string>>(new Set())
   const [battles, setBattles] = useState<Keyed<Battle>[]>([])
+  const [listings, setListings] = useState<Keyed<Listing>[]>([])
   const [mhmBalance, setMhmBalance] = useState<BN>(new BN(0))
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState<string>('')
@@ -48,16 +52,18 @@ export default function App() {
   const refresh = useCallback(async () => {
     if (!program || !wallet.publicKey) return
     try {
-      const [cfg, all, mine, fights] = await Promise.all([
+      const [cfg, all, mine, fights, sales] = await Promise.all([
         fetchConfig(program),
         fetchAllMonsters(program),
         fetchHeldMints(connection, wallet.publicKey),
         fetchAllBattles(program),
+        fetchAllListings(program),
       ])
       setConfig(cfg)
       setMonsters(all)
       setHeld(mine)
       setBattles(fights)
+      setListings(sales)
       try {
         const ata = getAssociatedTokenAddressSync(mhmMintPda(), wallet.publicKey)
         const acc = await getAccount(connection, ata)
@@ -132,6 +138,9 @@ export default function App() {
         <button className={tab === 'arena' ? 'on' : ''} onClick={() => setTab('arena')}>
           Arena ({battles.filter((b) => 'open' in b.account.state).length} open)
         </button>
+        <button className={tab === 'market' ? 'on' : ''} onClick={() => setTab('market')}>
+          Market ({listings.length})
+        </button>
       </nav>
 
       {status && <div className="status">{status}</div>}
@@ -205,6 +214,19 @@ export default function App() {
           me={wallet.publicKey}
           config={config}
           battles={battles}
+          myMonsters={myMonsters}
+          busy={busy}
+          run={run}
+        />
+      )}
+
+      {tab === 'market' && config && program && wallet.publicKey && (
+        <Market
+          program={program}
+          me={wallet.publicKey}
+          config={config}
+          listings={listings}
+          monsters={monsters}
           myMonsters={myMonsters}
           busy={busy}
           run={run}

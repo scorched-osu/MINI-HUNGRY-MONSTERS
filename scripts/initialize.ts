@@ -63,6 +63,7 @@ async function main() {
       feeWallet,
       burnBps: cfg.burnBps,
       battleFeeBps: cfg.battleFeeBps,
+      marketFeeBps: cfg.marketFeeBps,
       monsterPriceMhm: new BN(cfg.monsterPriceMhm),
       genesisPriceLamports: new BN(cfg.genesisPriceLamports),
       genesisRemaining: cfg.genesisRemaining,

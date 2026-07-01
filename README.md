@@ -56,6 +56,12 @@ with an attack does nothing.
 - **When you win, you receive the loser's entire mining pot** (minus a small
   configurable rake to the fee wallet), minted straight to your wallet.
 
+### 🛒 Marketplace
+List your monsters for sale priced in MHM: the NFT sits in an on-chain escrow
+until bought (2% fee to the fee wallet, rest to you) or delisted. The
+monster's unclaimed mining pot travels with it to the buyer. Being plain SPL
+NFTs, monsters can also trade on any external marketplace.
+
 ## Repository layout
 
 ```

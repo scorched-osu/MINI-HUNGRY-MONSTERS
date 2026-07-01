@@ -119,6 +119,7 @@ describe("mini-hungry-monsters", () => {
         feeWallet: feeWallet.publicKey,
         burnBps: 7000, // 70% of monster purchases burned, 30% to fee wallet
         battleFeeBps: 250, // 2.5% rake on battle loot
+        marketFeeBps: 200, // 2% marketplace fee
         monsterPriceMhm: new BN(100_000_000), // 100 MHM
         genesisPriceLamports: new BN(0.1 * LAMPORTS_PER_SOL),
         genesisRemaining: 1000,
@@ -285,5 +286,71 @@ describe("mini-hungry-monsters", () => {
     const b = await program.account.monster.fetch(monsterB.monster);
     assert.isFalse(a.inBattle);
     assert.isFalse(b.inBattle);
+  });
+
+  it("lists a monster for MHM and sells it on the marketplace", async () => {
+    const price = new BN(50_000_000); // 50 MHM
+    const [listing] = PublicKey.findProgramAddressSync(
+      [Buffer.from("listing"), monsterB.mint.toBuffer()],
+      program.programId
+    );
+    const escrow = getAssociatedTokenAddressSync(monsterB.mint, listing, true);
+
+    await program.methods
+      .listMonster(price)
+      .accounts({
+        config: configPda,
+        monster: monsterB.monster,
+        monsterMint: monsterB.mint,
+        sellerNftToken: monsterB.token,
+        listing,
+        escrowNftToken: escrow,
+        seller: playerB.publicKey,
+        systemProgram: SystemProgram.programId,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+      })
+      .signers([playerB])
+      .rpc();
+
+    // NFT is escrowed: seller no longer holds it.
+    const sellerNft = await getAccount(provider.connection, monsterB.token);
+    assert.equal(sellerNft.amount, 0n);
+
+    const buyerNft = getAssociatedTokenAddressSync(monsterB.mint, playerA.publicKey);
+    const sellerMhm = getAssociatedTokenAddressSync(mhmMint, playerB.publicKey);
+    const sellerBefore = await getAccount(provider.connection, sellerMhm).then(
+      (acc) => acc.amount,
+      () => 0n
+    );
+
+    await program.methods
+      .buyListing()
+      .accounts({
+        config: configPda,
+        listing,
+        monsterMint: monsterB.mint,
+        escrowNftToken: escrow,
+        buyerNftToken: buyerNft,
+        mhmMint,
+        buyerMhmAta: getAssociatedTokenAddressSync(mhmMint, playerA.publicKey),
+        seller: playerB.publicKey,
+        sellerMhmAta: sellerMhm,
+        feeWallet: feeWallet.publicKey,
+        feeMhmAta: getAssociatedTokenAddressSync(mhmMint, feeWallet.publicKey),
+        buyer: playerA.publicKey,
+        systemProgram: SystemProgram.programId,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+      })
+      .signers([playerA])
+      .rpc();
+
+    // Buyer holds the NFT; seller received the price minus the 2% fee.
+    const bought = await getAccount(provider.connection, buyerNft);
+    assert.equal(bought.amount, 1n);
+    const sellerAfter = (await getAccount(provider.connection, sellerMhm)).amount;
+    const fee = (BigInt(price.toString()) * 200n) / 10000n;
+    assert.equal(sellerAfter - sellerBefore, BigInt(price.toString()) - fee);
   });
 });

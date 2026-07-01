@@ -54,6 +54,10 @@ pub enum MhmError {
     BadFeeAccount,
     #[msg("Missing fee token account")]
     MissingFeeAccount,
+    #[msg("Listing price must be greater than zero")]
+    BadPrice,
+    #[msg("Only the seller can cancel this listing")]
+    NotSeller,
     #[msg("Unauthorized: admin only")]
     Unauthorized,
     #[msg("Arithmetic overflow")]

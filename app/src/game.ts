@@ -33,6 +33,7 @@ export interface GameConfig {
   feeWallet: PublicKey
   burnBps: number
   battleFeeBps: number
+  marketFeeBps: number
   monsterPriceMhm: BN
   genesisPriceLamports: BN
   genesisRemaining: number
@@ -77,6 +78,13 @@ export interface Battle {
   winner: number
 }
 
+export interface Listing {
+  seller: PublicKey
+  monsterMint: PublicKey
+  price: BN
+  createdTs: BN
+}
+
 export interface Keyed<T> {
   publicKey: PublicKey
   account: T
@@ -96,6 +104,8 @@ export const monsterPda = (mint: PublicKey) =>
   PublicKey.findProgramAddressSync([Buffer.from('monster'), mint.toBuffer()], PROGRAM_ID)[0]
 export const battlePda = (id: BN | number) =>
   PublicKey.findProgramAddressSync([Buffer.from('battle'), le8(id)], PROGRAM_ID)[0]
+export const listingPda = (mint: PublicKey) =>
+  PublicKey.findProgramAddressSync([Buffer.from('listing'), mint.toBuffer()], PROGRAM_ID)[0]
 
 // ---------- program ----------
 
@@ -126,6 +136,10 @@ export async function fetchAllMonsters(program: Program): Promise<Keyed<Monster>
 
 export async function fetchAllBattles(program: Program): Promise<Keyed<Battle>[]> {
   return (await accounts(program).battle.all()) as Keyed<Battle>[]
+}
+
+export async function fetchAllListings(program: Program): Promise<Keyed<Listing>[]> {
+  return (await accounts(program).listing.all()) as Keyed<Listing>[]
 }
 
 /** Mints (as base58 strings) of NFTs the wallet holds with amount == 1. */
@@ -284,6 +298,78 @@ export async function cancelBattle(
       battle: battle.publicKey,
       monster: monsterPda(battle.account.monsters[0]),
       creator,
+    })
+    .rpc()
+}
+
+export async function listMonster(
+  program: Program,
+  seller: PublicKey,
+  monster: Keyed<Monster>,
+  priceMicro: BN,
+) {
+  const mint = monster.account.mint
+  const listing = listingPda(mint)
+  return program.methods
+    .listMonster(priceMicro)
+    .accounts({
+      config: configPda(),
+      monster: monster.publicKey,
+      monsterMint: mint,
+      sellerNftToken: getAssociatedTokenAddressSync(mint, seller),
+      listing,
+      escrowNftToken: getAssociatedTokenAddressSync(mint, listing, true),
+      seller,
+      systemProgram: SystemProgram.programId,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+    })
+    .rpc()
+}
+
+export async function cancelListing(program: Program, seller: PublicKey, listing: Keyed<Listing>) {
+  const mint = listing.account.monsterMint
+  return program.methods
+    .cancelListing()
+    .accounts({
+      listing: listing.publicKey,
+      monsterMint: mint,
+      escrowNftToken: getAssociatedTokenAddressSync(mint, listing.publicKey, true),
+      sellerNftToken: getAssociatedTokenAddressSync(mint, seller),
+      seller,
+      systemProgram: SystemProgram.programId,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+    })
+    .rpc()
+}
+
+export async function buyListing(
+  program: Program,
+  buyer: PublicKey,
+  config: GameConfig,
+  listing: Keyed<Listing>,
+) {
+  const mint = listing.account.monsterMint
+  const mhmMint = mhmMintPda()
+  return program.methods
+    .buyListing()
+    .accounts({
+      config: configPda(),
+      listing: listing.publicKey,
+      monsterMint: mint,
+      escrowNftToken: getAssociatedTokenAddressSync(mint, listing.publicKey, true),
+      buyerNftToken: getAssociatedTokenAddressSync(mint, buyer),
+      mhmMint,
+      buyerMhmAta: getAssociatedTokenAddressSync(mhmMint, buyer),
+      seller: listing.account.seller,
+      sellerMhmAta: getAssociatedTokenAddressSync(mhmMint, listing.account.seller),
+      feeWallet: config.feeWallet,
+      feeMhmAta: getAssociatedTokenAddressSync(mhmMint, config.feeWallet),
+      buyer,
+      systemProgram: SystemProgram.programId,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
     })
     .rpc()
 }

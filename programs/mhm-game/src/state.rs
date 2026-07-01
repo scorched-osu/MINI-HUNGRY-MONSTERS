@@ -4,6 +4,7 @@ pub const CONFIG_SEED: &[u8] = b"config";
 pub const MHM_MINT_SEED: &[u8] = b"mhm-mint";
 pub const MONSTER_SEED: &[u8] = b"monster";
 pub const BATTLE_SEED: &[u8] = b"battle";
+pub const LISTING_SEED: &[u8] = b"listing";
 
 /// MHM coin uses 6 decimals; 1 MHM = 1_000_000 micro-MHM.
 pub const MHM_DECIMALS: u8 = 6;
@@ -68,6 +69,8 @@ pub struct GameConfig {
     pub burn_bps: u16,
     /// Rake taken from battle loot (basis points), sent to `fee_wallet`.
     pub battle_fee_bps: u16,
+    /// Fee on marketplace sales (basis points), sent to `fee_wallet`.
+    pub market_fee_bps: u16,
     /// Price in micro-MHM to buy (hatch) a new monster with MHM.
     pub monster_price_mhm: u64,
     /// Lamport price for genesis hatches (bootstraps the economy before MHM circulates).
@@ -194,4 +197,21 @@ impl Battle {
     pub fn side_of(&self, player: &Pubkey) -> Option<usize> {
         self.players.iter().position(|p| p == player)
     }
+}
+
+/// A marketplace listing: the monster NFT sits in a program escrow until the
+/// listing is bought (price paid in MHM) or cancelled. PDA seeded by the
+/// monster mint, so a monster can have at most one live listing.
+///
+/// The monster keeps mining while listed — its unclaimed pot travels with it
+/// to the buyer, and is part of what's being priced.
+#[account]
+#[derive(InitSpace)]
+pub struct Listing {
+    pub seller: Pubkey,
+    pub monster_mint: Pubkey,
+    /// Asking price in micro-MHM.
+    pub price: u64,
+    pub created_ts: i64,
+    pub bump: u8,
 }

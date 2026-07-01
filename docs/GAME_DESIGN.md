@@ -94,11 +94,25 @@ Supports only amplify a consumable of their matching type; a mismatched
 pairing is wasted. The catalog is a program constant today; a future version
 can move it to config or per-monster movesets/card inventories.
 
+## Marketplace
+
+Monsters are plain SPL NFTs, so they trade anywhere — but the built-in
+marketplace prices them in MHM and escrows the NFT on-chain:
+
+1. `list_monster(price)` — the NFT moves into a program escrow (a token
+   account owned by the listing PDA). One live listing per monster. A monster
+   locked in a battle cannot be listed, and a listed monster cannot battle
+   (its owner no longer holds the token).
+2. `buy_listing` — buyer pays the MHM price: `market_fee_bps` (default 2%) to
+   the fee wallet, the rest to the seller. The NFT — along with the monster's
+   unclaimed mining pot, which keeps accruing while listed — transfers to the
+   buyer.
+3. `cancel_listing` — seller reclaims the NFT and the escrow rent.
+
 ## Roadmap ideas
 
 - Metaplex metadata + art per rarity tier.
 - VRF randomness (Switchboard) for mint rolls.
-- Marketplace escrow for monster-for-MHM listings (today: any SPL marketplace).
 - More MHM sinks: consumable battle items, monster upgrades/evolution, name
   changes, breeding.
 - Matchmaking with pot-size brackets so whales can't snipe tiny pots.

@@ -28,6 +28,7 @@ changeable by the admin):
 | Genesis hatch | SOL price per hatch | Bootstraps the economy before MHM circulates; capped supply |
 | Monster purchase | 30% of MHM price (the non-burned share) | Transferred, not minted |
 | Battle rake | 2.5% of battle loot | Minted to the fee wallet on settlement |
+| Marketplace sale | 2% of the sale price | Transferred from the buyer's payment |
 
 ## Mining speeds — PLACEHOLDER
 

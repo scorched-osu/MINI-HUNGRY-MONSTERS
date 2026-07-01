@@ -16,7 +16,9 @@ use anchor_lang::prelude::*;
 use anchor_lang::solana_program::{program::invoke, system_instruction};
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token::spl_token::instruction::AuthorityType;
-use anchor_spl::token::{self, Burn, Mint, MintTo, SetAuthority, Token, TokenAccount, Transfer};
+use anchor_spl::token::{
+    self, Burn, CloseAccount, Mint, MintTo, SetAuthority, Token, TokenAccount, Transfer,
+};
 
 pub mod actions;
 pub mod combat;
@@ -54,6 +56,7 @@ pub mod mhm_game {
         }
         require!(params.burn_bps <= 10_000, MhmError::BadBps);
         require!(params.battle_fee_bps <= 10_000, MhmError::BadBps);
+        require!(params.market_fee_bps <= 10_000, MhmError::BadBps);
 
         let config = &mut ctx.accounts.config;
         config.admin = ctx.accounts.admin.key();
@@ -61,6 +64,7 @@ pub mod mhm_game {
         config.fee_wallet = params.fee_wallet;
         config.burn_bps = params.burn_bps;
         config.battle_fee_bps = params.battle_fee_bps;
+        config.market_fee_bps = params.market_fee_bps;
         config.monster_price_mhm = params.monster_price_mhm;
         config.genesis_price_lamports = params.genesis_price_lamports;
         config.genesis_remaining = params.genesis_remaining;
@@ -107,6 +111,10 @@ pub mod mhm_game {
         if let Some(battle_fee_bps) = params.battle_fee_bps {
             require!(battle_fee_bps <= 10_000, MhmError::BadBps);
             config.battle_fee_bps = battle_fee_bps;
+        }
+        if let Some(market_fee_bps) = params.market_fee_bps {
+            require!(market_fee_bps <= 10_000, MhmError::BadBps);
+            config.market_fee_bps = market_fee_bps;
         }
         if let Some(paused) = params.paused {
             config.paused = paused;
@@ -532,6 +540,145 @@ pub mod mhm_game {
         battle.state = BattleState::Settled;
         Ok(())
     }
+
+    /// List a monster for sale at an MHM price. The NFT moves into a program
+    /// escrow until the listing is bought or cancelled. The monster keeps
+    /// mining while listed — its unclaimed pot travels to the buyer.
+    pub fn list_monster(ctx: Context<ListMonster>, price: u64) -> Result<()> {
+        require!(!ctx.accounts.config.paused, MhmError::GamePaused);
+        require!(price > 0, MhmError::BadPrice);
+        require!(!ctx.accounts.monster.in_battle, MhmError::MonsterInBattle);
+
+        let listing = &mut ctx.accounts.listing;
+        listing.seller = ctx.accounts.seller.key();
+        listing.monster_mint = ctx.accounts.monster_mint.key();
+        listing.price = price;
+        listing.created_ts = Clock::get()?.unix_timestamp;
+        listing.bump = ctx.bumps.listing;
+
+        // Escrow the NFT.
+        token::transfer(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                Transfer {
+                    from: ctx.accounts.seller_nft_token.to_account_info(),
+                    to: ctx.accounts.escrow_nft_token.to_account_info(),
+                    authority: ctx.accounts.seller.to_account_info(),
+                },
+            ),
+            1,
+        )?;
+
+        emit!(MonsterListed {
+            monster: listing.monster_mint,
+            seller: listing.seller,
+            price,
+        });
+        Ok(())
+    }
+
+    /// Cancel your listing: the NFT returns from escrow to your wallet.
+    pub fn cancel_listing(ctx: Context<CancelListing>) -> Result<()> {
+        let mint = ctx.accounts.listing.monster_mint;
+        let bump = ctx.accounts.listing.bump;
+        let signer_seeds: &[&[&[u8]]] = &[&[LISTING_SEED, mint.as_ref(), &[bump]]];
+
+        token::transfer(
+            CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                Transfer {
+                    from: ctx.accounts.escrow_nft_token.to_account_info(),
+                    to: ctx.accounts.seller_nft_token.to_account_info(),
+                    authority: ctx.accounts.listing.to_account_info(),
+                },
+                signer_seeds,
+            ),
+            1,
+        )?;
+        token::close_account(CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            CloseAccount {
+                account: ctx.accounts.escrow_nft_token.to_account_info(),
+                destination: ctx.accounts.seller.to_account_info(),
+                authority: ctx.accounts.listing.to_account_info(),
+            },
+            signer_seeds,
+        ))?;
+
+        emit!(ListingCancelled { monster: mint, seller: ctx.accounts.seller.key() });
+        Ok(())
+    }
+
+    /// Buy a listed monster with MHM. `market_fee_bps` of the price goes to
+    /// the fee wallet, the rest to the seller; the NFT (and the monster's
+    /// unclaimed mining pot with it) transfers to the buyer.
+    pub fn buy_listing(ctx: Context<BuyListing>) -> Result<()> {
+        require!(!ctx.accounts.config.paused, MhmError::GamePaused);
+
+        let price = ctx.accounts.listing.price;
+        let fee = (price as u128 * ctx.accounts.config.market_fee_bps as u128 / 10_000) as u64;
+        let proceeds = price - fee;
+
+        if fee > 0 {
+            token::transfer(
+                CpiContext::new(
+                    ctx.accounts.token_program.to_account_info(),
+                    Transfer {
+                        from: ctx.accounts.buyer_mhm_ata.to_account_info(),
+                        to: ctx.accounts.fee_mhm_ata.to_account_info(),
+                        authority: ctx.accounts.buyer.to_account_info(),
+                    },
+                ),
+                fee,
+            )?;
+        }
+        token::transfer(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                Transfer {
+                    from: ctx.accounts.buyer_mhm_ata.to_account_info(),
+                    to: ctx.accounts.seller_mhm_ata.to_account_info(),
+                    authority: ctx.accounts.buyer.to_account_info(),
+                },
+            ),
+            proceeds,
+        )?;
+
+        // Release the NFT from escrow to the buyer.
+        let mint = ctx.accounts.listing.monster_mint;
+        let bump = ctx.accounts.listing.bump;
+        let signer_seeds: &[&[&[u8]]] = &[&[LISTING_SEED, mint.as_ref(), &[bump]]];
+        token::transfer(
+            CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                Transfer {
+                    from: ctx.accounts.escrow_nft_token.to_account_info(),
+                    to: ctx.accounts.buyer_nft_token.to_account_info(),
+                    authority: ctx.accounts.listing.to_account_info(),
+                },
+                signer_seeds,
+            ),
+            1,
+        )?;
+        token::close_account(CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            CloseAccount {
+                account: ctx.accounts.escrow_nft_token.to_account_info(),
+                destination: ctx.accounts.seller.to_account_info(),
+                authority: ctx.accounts.listing.to_account_info(),
+            },
+            signer_seeds,
+        ))?;
+
+        emit!(MonsterSold {
+            monster: mint,
+            seller: ctx.accounts.listing.seller,
+            buyer: ctx.accounts.buyer.key(),
+            price,
+            fee,
+        });
+        Ok(())
+    }
 }
 
 /// Roll rarity + stats and mint the NFT to the payer. Shared by genesis
@@ -636,6 +783,8 @@ pub struct InitializeParams {
     pub burn_bps: u16,
     /// Rake on battle loot, in basis points.
     pub battle_fee_bps: u16,
+    /// Fee on marketplace sales, in basis points.
+    pub market_fee_bps: u16,
     pub monster_price_mhm: u64,
     pub genesis_price_lamports: u64,
     pub genesis_remaining: u32,
@@ -648,6 +797,7 @@ pub struct UpdateConfigParams {
     pub fee_wallet: Option<Pubkey>,
     pub burn_bps: Option<u16>,
     pub battle_fee_bps: Option<u16>,
+    pub market_fee_bps: Option<u16>,
     pub monster_price_mhm: Option<u64>,
     pub genesis_price_lamports: Option<u64>,
     pub genesis_remaining: Option<u32>,
@@ -999,9 +1149,190 @@ pub struct AdminMintMhm<'info> {
     pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
+#[derive(Accounts)]
+pub struct ListMonster<'info> {
+    #[account(seeds = [CONFIG_SEED], bump = config.bump)]
+    pub config: Account<'info, GameConfig>,
+
+    #[account(
+        seeds = [MONSTER_SEED, monster_mint.key().as_ref()],
+        bump = monster.bump
+    )]
+    pub monster: Account<'info, Monster>,
+
+    pub monster_mint: Account<'info, Mint>,
+
+    #[account(
+        mut,
+        constraint = seller_nft_token.mint == monster_mint.key() @ MhmError::NotMonsterHolder,
+        constraint = seller_nft_token.owner == seller.key() @ MhmError::NotMonsterHolder,
+        constraint = seller_nft_token.amount == 1 @ MhmError::NotMonsterHolder,
+    )]
+    pub seller_nft_token: Account<'info, TokenAccount>,
+
+    #[account(
+        init,
+        payer = seller,
+        space = 8 + Listing::INIT_SPACE,
+        seeds = [LISTING_SEED, monster_mint.key().as_ref()],
+        bump
+    )]
+    pub listing: Account<'info, Listing>,
+
+    /// Escrow token account holding the NFT while listed; owned by the
+    /// listing PDA so only the program can release it.
+    #[account(
+        init,
+        payer = seller,
+        associated_token::mint = monster_mint,
+        associated_token::authority = listing,
+    )]
+    pub escrow_nft_token: Account<'info, TokenAccount>,
+
+    #[account(mut)]
+    pub seller: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+    pub token_program: Program<'info, Token>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+}
+
+#[derive(Accounts)]
+pub struct CancelListing<'info> {
+    #[account(
+        mut,
+        close = seller,
+        seeds = [LISTING_SEED, listing.monster_mint.as_ref()],
+        bump = listing.bump,
+        constraint = listing.seller == seller.key() @ MhmError::NotSeller,
+    )]
+    pub listing: Account<'info, Listing>,
+
+    #[account(address = listing.monster_mint)]
+    pub monster_mint: Account<'info, Mint>,
+
+    #[account(
+        mut,
+        associated_token::mint = monster_mint,
+        associated_token::authority = listing,
+    )]
+    pub escrow_nft_token: Account<'info, TokenAccount>,
+
+    #[account(
+        init_if_needed,
+        payer = seller,
+        associated_token::mint = monster_mint,
+        associated_token::authority = seller,
+    )]
+    pub seller_nft_token: Account<'info, TokenAccount>,
+
+    #[account(mut)]
+    pub seller: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+    pub token_program: Program<'info, Token>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+}
+
+#[derive(Accounts)]
+pub struct BuyListing<'info> {
+    #[account(seeds = [CONFIG_SEED], bump = config.bump)]
+    pub config: Account<'info, GameConfig>,
+
+    #[account(
+        mut,
+        close = seller,
+        seeds = [LISTING_SEED, listing.monster_mint.as_ref()],
+        bump = listing.bump,
+    )]
+    pub listing: Account<'info, Listing>,
+
+    #[account(address = listing.monster_mint)]
+    pub monster_mint: Account<'info, Mint>,
+
+    #[account(
+        mut,
+        associated_token::mint = monster_mint,
+        associated_token::authority = listing,
+    )]
+    pub escrow_nft_token: Account<'info, TokenAccount>,
+
+    #[account(
+        init_if_needed,
+        payer = buyer,
+        associated_token::mint = monster_mint,
+        associated_token::authority = buyer,
+    )]
+    pub buyer_nft_token: Account<'info, TokenAccount>,
+
+    #[account(seeds = [MHM_MINT_SEED], bump, address = config.mhm_mint)]
+    pub mhm_mint: Account<'info, Mint>,
+
+    #[account(
+        mut,
+        associated_token::mint = mhm_mint,
+        associated_token::authority = buyer,
+    )]
+    pub buyer_mhm_ata: Account<'info, TokenAccount>,
+
+    /// CHECK: the seller; receives sale proceeds and reclaimed rent.
+    /// Enforced to match the listing.
+    #[account(mut, address = listing.seller)]
+    pub seller: UncheckedAccount<'info>,
+
+    #[account(
+        init_if_needed,
+        payer = buyer,
+        associated_token::mint = mhm_mint,
+        associated_token::authority = seller,
+    )]
+    pub seller_mhm_ata: Account<'info, TokenAccount>,
+
+    /// CHECK: the configured fee wallet.
+    #[account(address = config.fee_wallet)]
+    pub fee_wallet: UncheckedAccount<'info>,
+
+    #[account(
+        init_if_needed,
+        payer = buyer,
+        associated_token::mint = mhm_mint,
+        associated_token::authority = fee_wallet,
+    )]
+    pub fee_mhm_ata: Account<'info, TokenAccount>,
+
+    #[account(mut)]
+    pub buyer: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+    pub token_program: Program<'info, Token>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+}
+
 // ---------------------------------------------------------------------------
 // Events
 // ---------------------------------------------------------------------------
+
+#[event]
+pub struct MonsterListed {
+    pub monster: Pubkey,
+    pub seller: Pubkey,
+    pub price: u64,
+}
+
+#[event]
+pub struct ListingCancelled {
+    pub monster: Pubkey,
+    pub seller: Pubkey,
+}
+
+#[event]
+pub struct MonsterSold {
+    pub monster: Pubkey,
+    pub seller: Pubkey,
+    pub buyer: Pubkey,
+    pub price: u64,
+    pub fee: u64,
+}
 
 #[event]
 pub struct MonsterMinted {
