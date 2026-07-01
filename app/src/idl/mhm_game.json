@@ -1,0 +1,2617 @@
+{
+  "address": "594wvdBsGrU6g6LswPmsx7tk1Cc7fgrpDAxvF8CEWq9K",
+  "metadata": {
+    "name": "mhm_game",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "MINI-HUNGRY-MONSTERS: idle NFT mining + turn-based battle game on Solana"
+  },
+  "instructions": [
+    {
+      "name": "admin_mint_mhm",
+      "docs": [
+        "Admin-only: mint an MHM allocation to a designated holder wallet.",
+        "Used to seed the initial MHM holder wallets (team / treasury /",
+        "liquidity allocations) before mining supply ramps up."
+      ],
+      "discriminator": [
+        100,
+        94,
+        255,
+        56,
+        109,
+        129,
+        42,
+        65
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "mhm_mint",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  104,
+                  109,
+                  45,
+                  109,
+                  105,
+                  110,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "recipient",
+          "docs": [
+            "signs off on the destination."
+          ]
+        },
+        {
+          "name": "recipient_mhm_ata",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "recipient"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mhm_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "buy_monster",
+      "docs": [
+        "Buy a monster with MHM coin. `burn_bps` of the price is burned",
+        "(deflationary sink); the rest goes to the fee wallet."
+      ],
+      "discriminator": [
+        45,
+        163,
+        72,
+        238,
+        171,
+        96,
+        151,
+        247
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "mhm_mint",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  104,
+                  109,
+                  45,
+                  109,
+                  105,
+                  110,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "payer_mhm_ata",
+          "docs": [
+            "Buyer's MHM account; the purchase price is taken from here."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "payer"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mhm_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "fee_wallet"
+        },
+        {
+          "name": "fee_mhm_ata",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "fee_wallet"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mhm_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "monster_mint",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  111,
+                  110,
+                  115,
+                  116,
+                  101,
+                  114,
+                  45,
+                  109,
+                  105,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "monster_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "monster",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  111,
+                  110,
+                  115,
+                  116,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "monster_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "monster_token",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "payer"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "monster_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "rent",
+          "address": "SysvarRent111111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "monster_id",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "cancel_battle",
+      "docs": [
+        "Cancel an open challenge nobody has accepted. Returns the pot to the",
+        "monster and unlocks it."
+      ],
+      "discriminator": [
+        234,
+        61,
+        97,
+        187,
+        97,
+        170,
+        101,
+        141
+      ],
+      "accounts": [
+        {
+          "name": "battle",
+          "writable": true
+        },
+        {
+          "name": "monster",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  111,
+                  110,
+                  115,
+                  116,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "monster.mint",
+                "account": "Monster"
+              }
+            ]
+          }
+        },
+        {
+          "name": "creator",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "claim_mining",
+      "docs": [
+        "Claim everything this monster has mined so far. Mints MHM to the",
+        "current NFT holder."
+      ],
+      "discriminator": [
+        222,
+        36,
+        64,
+        123,
+        32,
+        17,
+        219,
+        8
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "monster",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  111,
+                  110,
+                  115,
+                  116,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "monster.mint",
+                "account": "Monster"
+              }
+            ]
+          }
+        },
+        {
+          "name": "holder_nft_token",
+          "docs": [
+            "Proof of ownership: the holder's token account for this monster's NFT."
+          ]
+        },
+        {
+          "name": "mhm_mint",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  104,
+                  109,
+                  45,
+                  109,
+                  105,
+                  110,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "holder_mhm_ata",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "holder"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mhm_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "holder",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "claim_timeout",
+      "docs": [
+        "If your opponent let the 90 second clock run out without submitting",
+        "(and you did submit), claim the win. If BOTH sides went silent,",
+        "either player can call this to end the battle as a draw."
+      ],
+      "discriminator": [
+        130,
+        234,
+        45,
+        53,
+        120,
+        90,
+        86,
+        178
+      ],
+      "accounts": [
+        {
+          "name": "battle",
+          "writable": true
+        },
+        {
+          "name": "player",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "create_battle",
+      "docs": [
+        "Open a battle challenge. HIGH RISK: the monster's entire unclaimed",
+        "mining pot goes on the line the moment the challenge is created."
+      ],
+      "discriminator": [
+        2,
+        249,
+        54,
+        216,
+        42,
+        99,
+        187,
+        102
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "battle",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  97,
+                  116,
+                  116,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "battle_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "monster",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  111,
+                  110,
+                  115,
+                  116,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "monster.mint",
+                "account": "Monster"
+              }
+            ]
+          }
+        },
+        {
+          "name": "creator_nft_token"
+        },
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "battle_id",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "hatch_genesis",
+      "docs": [
+        "Genesis hatch: buy a monster for SOL. This bootstraps the economy",
+        "before any MHM circulates; supply is capped by `genesis_remaining`."
+      ],
+      "discriminator": [
+        83,
+        9,
+        209,
+        249,
+        129,
+        71,
+        228,
+        144
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "monster_mint",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  111,
+                  110,
+                  115,
+                  116,
+                  101,
+                  114,
+                  45,
+                  109,
+                  105,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "monster_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "monster",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  111,
+                  110,
+                  115,
+                  116,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "monster_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "monster_token",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "payer"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "monster_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "fee_wallet",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "rent",
+          "address": "SysvarRent111111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "monster_id",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "initialize",
+      "docs": [
+        "One-time setup: creates the global config and the MHM coin mint",
+        "(authority = config PDA, so only this program can mint MHM)."
+      ],
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "mhm_mint",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  104,
+                  109,
+                  45,
+                  109,
+                  105,
+                  110,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "rent",
+          "address": "SysvarRent111111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "params",
+          "type": {
+            "defined": {
+              "name": "InitializeParams"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "join_battle",
+      "docs": [
+        "Accept an open challenge with your own monster. Turn 1 starts now;",
+        "both players have 90 seconds per turn to submit actions."
+      ],
+      "discriminator": [
+        126,
+        0,
+        69,
+        130,
+        127,
+        145,
+        54,
+        100
+      ],
+      "accounts": [
+        {
+          "name": "battle",
+          "writable": true
+        },
+        {
+          "name": "monster",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  111,
+                  110,
+                  115,
+                  116,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "monster.mint",
+                "account": "Monster"
+              }
+            ]
+          }
+        },
+        {
+          "name": "joiner_nft_token"
+        },
+        {
+          "name": "joiner",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "settle_battle",
+      "docs": [
+        "Pay out a finished battle and unlock both monsters. Permissionless",
+        "crank — anyone can call it once a winner is decided.",
+        "",
+        "WINNER TAKES ALL: the loser's entire staked mining pot is minted as",
+        "MHM straight to the winning player's wallet, and the winner's own pot",
+        "returns to their monster's unclaimed balance. On a draw both pots",
+        "simply return home."
+      ],
+      "discriminator": [
+        4,
+        146,
+        32,
+        157,
+        82,
+        216,
+        214,
+        28
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "battle",
+          "writable": true
+        },
+        {
+          "name": "monster_a",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  111,
+                  110,
+                  115,
+                  116,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "monster_a.mint",
+                "account": "Monster"
+              }
+            ]
+          }
+        },
+        {
+          "name": "monster_b",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  111,
+                  110,
+                  115,
+                  116,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "monster_b.mint",
+                "account": "Monster"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mhm_mint",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  104,
+                  109,
+                  45,
+                  109,
+                  105,
+                  110,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "winner_mhm_ata",
+          "docs": [
+            "The winning player's MHM token account (required unless the battle",
+            "was a draw). Loot is minted here."
+          ],
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "fee_mhm_ata",
+          "docs": [
+            "The fee wallet's MHM token account (required when a battle rake is",
+            "configured and there is a winner). The rake is minted here."
+          ],
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "submit_action",
+      "docs": [
+        "Submit this turn's actions: one CONSUMABLE (DPS / DEF / HP+) and",
+        "optionally one SUPPORT (SUPP) to boost it. Pass `support = 255` for",
+        "no support. When the second player submits, the turn resolves",
+        "immediately in the same transaction."
+      ],
+      "discriminator": [
+        222,
+        59,
+        32,
+        151,
+        194,
+        137,
+        175,
+        150
+      ],
+      "accounts": [
+        {
+          "name": "battle",
+          "writable": true
+        },
+        {
+          "name": "player",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "consumable",
+          "type": "u8"
+        },
+        {
+          "name": "support",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "update_config",
+      "docs": [
+        "Admin knob-turning: mining speeds, prices and odds are still being",
+        "tuned, so they are updatable without redeploying."
+      ],
+      "discriminator": [
+        29,
+        158,
+        252,
+        191,
+        10,
+        83,
+        219,
+        99
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "params",
+          "type": {
+            "defined": {
+              "name": "UpdateConfigParams"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Battle",
+      "discriminator": [
+        81,
+        148,
+        121,
+        71,
+        63,
+        166,
+        116,
+        24
+      ]
+    },
+    {
+      "name": "GameConfig",
+      "discriminator": [
+        45,
+        146,
+        146,
+        33,
+        170,
+        69,
+        96,
+        133
+      ]
+    },
+    {
+      "name": "Monster",
+      "discriminator": [
+        130,
+        97,
+        64,
+        4,
+        240,
+        90,
+        138,
+        11
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "BattleCreated",
+      "discriminator": [
+        33,
+        66,
+        118,
+        96,
+        130,
+        0,
+        113,
+        218
+      ]
+    },
+    {
+      "name": "BattleFinished",
+      "discriminator": [
+        216,
+        198,
+        118,
+        186,
+        252,
+        198,
+        15,
+        109
+      ]
+    },
+    {
+      "name": "BattleJoined",
+      "discriminator": [
+        135,
+        195,
+        19,
+        119,
+        186,
+        10,
+        187,
+        48
+      ]
+    },
+    {
+      "name": "BattleSettled",
+      "discriminator": [
+        227,
+        254,
+        73,
+        116,
+        30,
+        106,
+        42,
+        155
+      ]
+    },
+    {
+      "name": "MiningClaimed",
+      "discriminator": [
+        140,
+        230,
+        43,
+        210,
+        9,
+        77,
+        44,
+        11
+      ]
+    },
+    {
+      "name": "MonsterMinted",
+      "discriminator": [
+        165,
+        170,
+        38,
+        92,
+        230,
+        114,
+        93,
+        255
+      ]
+    },
+    {
+      "name": "TurnResolved",
+      "discriminator": [
+        123,
+        208,
+        138,
+        8,
+        148,
+        6,
+        53,
+        10
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "GamePaused",
+      "msg": "The game is paused"
+    },
+    {
+      "code": 6001,
+      "name": "BadRarityWeights",
+      "msg": "Rarity weights must sum to 10000 basis points"
+    },
+    {
+      "code": 6002,
+      "name": "BadMiningRange",
+      "msg": "Mining rate range is invalid (min > max)"
+    },
+    {
+      "code": 6003,
+      "name": "GenesisSoldOut",
+      "msg": "No genesis hatches remaining"
+    },
+    {
+      "code": 6004,
+      "name": "NotMonsterHolder",
+      "msg": "Signer does not hold this monster's NFT"
+    },
+    {
+      "code": 6005,
+      "name": "MonsterInBattle",
+      "msg": "Monster is locked in a battle"
+    },
+    {
+      "code": 6006,
+      "name": "MonsterNotInBattle",
+      "msg": "Monster is not part of this battle"
+    },
+    {
+      "code": 6007,
+      "name": "NothingToClaim",
+      "msg": "Nothing to claim"
+    },
+    {
+      "code": 6008,
+      "name": "BattleNotOpen",
+      "msg": "Battle is not open for joining"
+    },
+    {
+      "code": 6009,
+      "name": "BattleNotActive",
+      "msg": "Battle is not active"
+    },
+    {
+      "code": 6010,
+      "name": "BattleNotFinished",
+      "msg": "Battle is not finished"
+    },
+    {
+      "code": 6011,
+      "name": "NotABattlePlayer",
+      "msg": "You are not a player in this battle"
+    },
+    {
+      "code": 6012,
+      "name": "CannotBattleSelf",
+      "msg": "You cannot battle your own monster"
+    },
+    {
+      "code": 6013,
+      "name": "UnknownAction",
+      "msg": "Unknown action id"
+    },
+    {
+      "code": 6014,
+      "name": "NotAConsumable",
+      "msg": "That action does not fit in the consumable slot"
+    },
+    {
+      "code": 6015,
+      "name": "NotASupport",
+      "msg": "That action does not fit in the support slot"
+    },
+    {
+      "code": 6016,
+      "name": "AlreadySubmitted",
+      "msg": "Actions already submitted for this turn"
+    },
+    {
+      "code": 6017,
+      "name": "TurnDeadlinePassed",
+      "msg": "The 90 second turn deadline has passed"
+    },
+    {
+      "code": 6018,
+      "name": "DeadlineNotReached",
+      "msg": "The turn deadline has not passed yet"
+    },
+    {
+      "code": 6019,
+      "name": "CallerDidNotSubmit",
+      "msg": "You did not submit an action this turn, so you cannot claim the timeout win"
+    },
+    {
+      "code": 6020,
+      "name": "NotBattleCreator",
+      "msg": "Only the battle creator can cancel"
+    },
+    {
+      "code": 6021,
+      "name": "BadWinnerAccount",
+      "msg": "Winner token account does not belong to the winning player"
+    },
+    {
+      "code": 6022,
+      "name": "MissingWinnerAccount",
+      "msg": "Missing winner token account"
+    },
+    {
+      "code": 6023,
+      "name": "BadBps",
+      "msg": "Basis points value cannot exceed 10000"
+    },
+    {
+      "code": 6024,
+      "name": "BadFeeAccount",
+      "msg": "Fee token account does not belong to the configured fee wallet"
+    },
+    {
+      "code": 6025,
+      "name": "MissingFeeAccount",
+      "msg": "Missing fee token account"
+    },
+    {
+      "code": 6026,
+      "name": "Unauthorized",
+      "msg": "Unauthorized: admin only"
+    },
+    {
+      "code": 6027,
+      "name": "Overflow",
+      "msg": "Arithmetic overflow"
+    }
+  ],
+  "types": [
+    {
+      "name": "Battle",
+      "docs": [
+        "One battle between two monsters. Index 0 = challenger, 1 = joiner."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "state",
+            "type": {
+              "defined": {
+                "name": "BattleState"
+              }
+            }
+          },
+          {
+            "name": "players",
+            "docs": [
+              "Wallets in control of each side (snapshotted when each side locks in)."
+            ],
+            "type": {
+              "array": [
+                "pubkey",
+                2
+              ]
+            }
+          },
+          {
+            "name": "monsters",
+            "docs": [
+              "Monster NFT mints on each side."
+            ],
+            "type": {
+              "array": [
+                "pubkey",
+                2
+              ]
+            }
+          },
+          {
+            "name": "pots",
+            "docs": [
+              "micro-MHM at stake per side: the monster's whole unclaimed mining pot."
+            ],
+            "type": {
+              "array": [
+                "u64",
+                2
+              ]
+            }
+          },
+          {
+            "name": "hp",
+            "type": {
+              "array": [
+                "u32",
+                2
+              ]
+            }
+          },
+          {
+            "name": "max_hp",
+            "type": {
+              "array": [
+                "u32",
+                2
+              ]
+            }
+          },
+          {
+            "name": "power",
+            "type": {
+              "array": [
+                "u32",
+                2
+              ]
+            }
+          },
+          {
+            "name": "defense",
+            "type": {
+              "array": [
+                "u32",
+                2
+              ]
+            }
+          },
+          {
+            "name": "def_buff",
+            "docs": [
+              "Temporary defense buff from DEF actions."
+            ],
+            "type": {
+              "array": [
+                "u32",
+                2
+              ]
+            }
+          },
+          {
+            "name": "def_buff_turns",
+            "docs": [
+              "Turns the defense buff has left."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          },
+          {
+            "name": "pending",
+            "type": {
+              "array": [
+                {
+                  "defined": {
+                    "name": "PendingAction"
+                  }
+                },
+                2
+              ]
+            }
+          },
+          {
+            "name": "turn",
+            "type": "u16"
+          },
+          {
+            "name": "deadline",
+            "docs": [
+              "Unix time by which both players must have submitted this turn's actions."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "winner",
+            "docs": [
+              "0 or 1 = winning side, DRAW (2) = draw, NONE_U8 = undecided."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BattleCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "battle",
+            "type": "pubkey"
+          },
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "monster",
+            "type": "pubkey"
+          },
+          {
+            "name": "pot",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BattleFinished",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "battle",
+            "type": "pubkey"
+          },
+          {
+            "name": "winner",
+            "docs": [
+              "0 or 1 = winning side index, 2 = draw."
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BattleJoined",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "battle",
+            "type": "pubkey"
+          },
+          {
+            "name": "joiner",
+            "type": "pubkey"
+          },
+          {
+            "name": "monster",
+            "type": "pubkey"
+          },
+          {
+            "name": "pot",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BattleSettled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "battle",
+            "type": "pubkey"
+          },
+          {
+            "name": "winner",
+            "type": "pubkey"
+          },
+          {
+            "name": "loot",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BattleState",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Open"
+          },
+          {
+            "name": "Active"
+          },
+          {
+            "name": "Finished"
+          },
+          {
+            "name": "Cancelled"
+          },
+          {
+            "name": "Settled"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GameConfig",
+      "docs": [
+        "Global game configuration. Single PDA, seeded by [CONFIG_SEED].",
+        "",
+        "All economy numbers (mining ranges, prices, rarity odds) live here so the",
+        "admin can tune them without redeploying the program — the exact mining",
+        "speeds are still under discussion."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "mhm_mint",
+            "docs": [
+              "The MHM coin mint (PDA, authority = this config account)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "fee_wallet",
+            "docs": [
+              "Wallet that receives ALL fees: genesis SOL payments, the non-burned",
+              "share of MHM monster purchases, and the battle rake."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "burn_bps",
+            "docs": [
+              "Share of the MHM monster price that is burned (basis points).",
+              "The remainder is transferred to `fee_wallet`'s MHM account."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "battle_fee_bps",
+            "docs": [
+              "Rake taken from battle loot (basis points), sent to `fee_wallet`."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "monster_price_mhm",
+            "docs": [
+              "Price in micro-MHM to buy (hatch) a new monster with MHM."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "genesis_price_lamports",
+            "docs": [
+              "Lamport price for genesis hatches (bootstraps the economy before MHM circulates)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "genesis_remaining",
+            "docs": [
+              "How many genesis (SOL-priced) hatches remain."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "mining_rate_ranges",
+            "docs": [
+              "Mining speed ranges per rarity, in micro-MHM per hour: [min, max]."
+            ],
+            "type": {
+              "array": [
+                {
+                  "array": [
+                    "u64",
+                    2
+                  ]
+                },
+                5
+              ]
+            }
+          },
+          {
+            "name": "rarity_weights_bps",
+            "docs": [
+              "Rarity roll weights in basis points (must sum to 10_000)."
+            ],
+            "type": {
+              "array": [
+                "u16",
+                5
+              ]
+            }
+          },
+          {
+            "name": "monsters_minted",
+            "docs": [
+              "Total monsters ever minted (also used as the next monster id)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "battles_created",
+            "docs": [
+              "Total battles ever created (also used as the next battle id)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "paused",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "InitializeParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "fee_wallet",
+            "docs": [
+              "Wallet that receives all fees (genesis SOL, MHM purchase fees, battle rake)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "burn_bps",
+            "docs": [
+              "Share of MHM monster purchases that is burned, in basis points."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "battle_fee_bps",
+            "docs": [
+              "Rake on battle loot, in basis points."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "monster_price_mhm",
+            "type": "u64"
+          },
+          {
+            "name": "genesis_price_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "genesis_remaining",
+            "type": "u32"
+          },
+          {
+            "name": "mining_rate_ranges",
+            "type": {
+              "array": [
+                {
+                  "array": [
+                    "u64",
+                    2
+                  ]
+                },
+                5
+              ]
+            }
+          },
+          {
+            "name": "rarity_weights_bps",
+            "type": {
+              "array": [
+                "u16",
+                5
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "MiningClaimed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "monster",
+            "type": "pubkey"
+          },
+          {
+            "name": "holder",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Monster",
+      "docs": [
+        "On-chain state for one MINI-HUNGRY-MONSTER NFT.",
+        "",
+        "The NFT itself is an SPL mint with supply 1 / decimals 0; whoever holds",
+        "that token owns the monster (so monsters trade on any SPL marketplace).",
+        "This PDA (seeded by the mint) carries the game data."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "mint",
+            "docs": [
+              "The SPL mint of this NFT."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "rarity",
+            "type": {
+              "defined": {
+                "name": "Rarity"
+              }
+            }
+          },
+          {
+            "name": "mining_rate",
+            "docs": [
+              "Mining speed in micro-MHM per hour."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "last_settled_ts",
+            "docs": [
+              "Timestamp mining last settled from."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "unclaimed",
+            "docs": [
+              "Mined-but-unclaimed micro-MHM banked on this monster.",
+              "THIS is the pot an opponent wins if they beat this monster in battle."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "max_hp",
+            "type": "u32"
+          },
+          {
+            "name": "power",
+            "type": "u32"
+          },
+          {
+            "name": "defense",
+            "type": "u32"
+          },
+          {
+            "name": "wins",
+            "type": "u32"
+          },
+          {
+            "name": "losses",
+            "type": "u32"
+          },
+          {
+            "name": "in_battle",
+            "docs": [
+              "While in a battle the monster is locked: no claiming, no other battles."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "battle",
+            "docs": [
+              "The battle this monster is locked into (default Pubkey when not in battle)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MonsterMinted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "monster",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "rarity",
+            "type": {
+              "defined": {
+                "name": "Rarity"
+              }
+            }
+          },
+          {
+            "name": "mining_rate",
+            "type": "u64"
+          },
+          {
+            "name": "max_hp",
+            "type": "u32"
+          },
+          {
+            "name": "power",
+            "type": "u32"
+          },
+          {
+            "name": "defense",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PendingAction",
+      "docs": [
+        "A player's selected actions for the current turn."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "submitted",
+            "type": "bool"
+          },
+          {
+            "name": "consumable",
+            "docs": [
+              "Action id from the catalog; must be a CONSUMABLE-slot action."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "support",
+            "docs": [
+              "Action id from the catalog; must be a SUPPORT-slot action, or NONE_U8."
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Rarity",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Standard"
+          },
+          {
+            "name": "Rare"
+          },
+          {
+            "name": "Epic"
+          },
+          {
+            "name": "Legendary"
+          },
+          {
+            "name": "Unique"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TurnResolved",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "battle",
+            "type": "pubkey"
+          },
+          {
+            "name": "turn",
+            "type": "u16"
+          },
+          {
+            "name": "hp",
+            "type": {
+              "array": [
+                "u32",
+                2
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "UpdateConfigParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "fee_wallet",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "burn_bps",
+            "type": {
+              "option": "u16"
+            }
+          },
+          {
+            "name": "battle_fee_bps",
+            "type": {
+              "option": "u16"
+            }
+          },
+          {
+            "name": "monster_price_mhm",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "genesis_price_lamports",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "genesis_remaining",
+            "type": {
+              "option": "u32"
+            }
+          },
+          {
+            "name": "mining_rate_ranges",
+            "type": {
+              "option": {
+                "array": [
+                  {
+                    "array": [
+                      "u64",
+                      2
+                    ]
+                  },
+                  5
+                ]
+              }
+            }
+          },
+          {
+            "name": "rarity_weights_bps",
+            "type": {
+              "option": {
+                "array": [
+                  "u16",
+                  5
+                ]
+              }
+            }
+          },
+          {
+            "name": "paused",
+            "type": {
+              "option": "bool"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

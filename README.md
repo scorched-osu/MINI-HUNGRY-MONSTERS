@@ -64,6 +64,7 @@ programs/mhm-game/     Anchor on-chain program (token, NFTs, mining, battles)
   src/actions.rs       The action catalog (CONSUMABLE / SUPPORT slots)
   src/combat.rs        Turn resolution engine + unit tests
   src/rng.rs           Mint-roll randomness (swap for a VRF before mainnet!)
+app/                   Web client (Vite + React + wallet adapter)
 tests/                 Anchor integration tests (localnet)
 scripts/               initialize.ts + config for fee wallet & MHM allocations
 docs/                  Game design + tokenomics notes
@@ -96,6 +97,18 @@ npm run initialize
   share of MHM monster purchases, and the battle rake.
 - `initialMhmHolders` each receive their MHM allocation at launch via the
   admin-only `admin_mint_mhm` instruction.
+
+### Playing (web client)
+
+```bash
+cd app
+npm install
+VITE_RPC_URL=https://api.devnet.solana.com npm run dev   # defaults to localnet
+```
+
+Connect Phantom or Solflare, hatch a monster, watch it mine, and hit the
+Arena tab to battle. If you change the on-chain program, regenerate the IDL
+the app uses: `anchor idl build --program-name mhm_game -o app/src/idl/mhm_game.json`.
 
 ## ⚠️ Before mainnet
 
