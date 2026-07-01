@@ -1,0 +1,36 @@
+{
+  "$comment": "Live deploy config, consumed by `npm run initialize`. All MHM amounts are in whole MHM unless suffixed otherwise; 1 MHM = 1000000 micro-MHM on-chain.",
+
+  "feeWallet": "CzkwjAD9ADyeQujGQViCkJjhNAswuimgbXmtP7gE4nBG",
+
+  "initialMhmHolders": [
+    {
+      "$comment": "Initial MHM allocation minted at launch. amountMhm is a PLACEHOLDER — adjust before running initialize, and add one entry per additional holder wallet.",
+      "address": "CzkwjAD9ADyeQujGQViCkJjhNAswuimgbXmtP7gE4nBG",
+      "amountMhm": 1000000
+    }
+  ],
+
+  "burnBps": 7000,
+  "battleFeeBps": 250,
+  "monsterPriceMhm": 100000000,
+  "genesisPriceLamports": 100000000,
+  "genesisRemaining": 1000,
+
+  "miningRateRangesMhmPerHour": {
+    "$comment": "PLACEHOLDER values (whole MHM per hour) pending the mining-speed discussion. Tunable later via update_config without redeploying.",
+    "standard": [0.1, 1],
+    "rare": [1, 3],
+    "epic": [3, 7],
+    "legendary": [7, 13],
+    "unique": [13, 21]
+  },
+
+  "rarityWeightsBps": {
+    "standard": 6000,
+    "rare": 2500,
+    "epic": 1000,
+    "legendary": 400,
+    "unique": 100
+  }
+}

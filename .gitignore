@@ -8,4 +8,3 @@ test-ledger/
 .env
 keypairs/
 !keypairs/.gitkeep
-scripts/config.json
