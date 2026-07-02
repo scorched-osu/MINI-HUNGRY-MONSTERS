@@ -143,6 +143,11 @@ describe("mini-hungry-monsters", () => {
         config: configPda,
         mhmMint,
         admin: admin.publicKey,
+        program: program.programId,
+        programData: PublicKey.findProgramAddressSync(
+          [program.programId.toBuffer()],
+          new PublicKey("BPFLoaderUpgradeab1e11111111111111111111111")
+        )[0],
         systemProgram: SystemProgram.programId,
         tokenProgram: TOKEN_PROGRAM_ID,
         rent: SYSVAR_RENT_PUBKEY,

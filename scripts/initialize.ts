@@ -49,6 +49,13 @@ async function main() {
     [Buffer.from("config")],
     program.programId
   );
+  const BPF_LOADER_UPGRADEABLE = new PublicKey(
+    "BPFLoaderUpgradeab1e11111111111111111111111"
+  );
+  const [programData] = PublicKey.findProgramAddressSync(
+    [program.programId.toBuffer()],
+    BPF_LOADER_UPGRADEABLE
+  );
   const [mhmMint] = PublicKey.findProgramAddressSync(
     [Buffer.from("mhm-mint")],
     program.programId
@@ -87,6 +94,8 @@ async function main() {
       config: configPda,
       mhmMint,
       admin: provider.wallet.publicKey,
+      program: program.programId,
+      programData,
       systemProgram: SystemProgram.programId,
       tokenProgram: TOKEN_PROGRAM_ID,
       rent: SYSVAR_RENT_PUBKEY,

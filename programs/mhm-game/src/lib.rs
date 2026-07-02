@@ -893,6 +893,17 @@ pub struct Initialize<'info> {
 
     #[account(mut)]
     pub admin: Signer<'info>,
+
+    /// This program, used to prove the initializer is the deploy authority.
+    #[account(constraint = program.programdata_address()? == Some(program_data.key()) @ MhmError::Unauthorized)]
+    pub program: Program<'info, program::MhmGame>,
+
+    /// The program's upgrade-authority record. Constraining `initialize` to
+    /// the upgrade authority closes the deploy-time front-running window where
+    /// an attacker could otherwise call `initialize` first and seize admin.
+    #[account(constraint = program_data.upgrade_authority_address == Some(admin.key()) @ MhmError::Unauthorized)]
+    pub program_data: Account<'info, ProgramData>,
+
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
     pub rent: Sysvar<'info, Rent>,
