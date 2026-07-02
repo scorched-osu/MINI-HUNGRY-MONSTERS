@@ -26,6 +26,15 @@ const SNACK = 5;
 const PWR_PLUS = 7;
 const NO_SUPPORT = 255;
 
+const TOKEN_METADATA_PROGRAM_ID = new PublicKey(
+  "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
+);
+const metadataPda = (mint: PublicKey) =>
+  PublicKey.findProgramAddressSync(
+    [Buffer.from("metadata"), TOKEN_METADATA_PROGRAM_ID.toBuffer(), mint.toBuffer()],
+    TOKEN_METADATA_PROGRAM_ID
+  )[0];
+
 describe("mini-hungry-monsters", () => {
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
@@ -88,10 +97,12 @@ describe("mini-hungry-monsters", () => {
         monsterMint: mint,
         monster,
         monsterToken: token,
+        metadata: metadataPda(mint),
         payer: payer.publicKey,
         feeWallet: feeWallet.publicKey,
         systemProgram: SystemProgram.programId,
         tokenProgram: TOKEN_PROGRAM_ID,
+        tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
         associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
         rent: SYSVAR_RENT_PUBKEY,
       })
@@ -120,6 +131,8 @@ describe("mini-hungry-monsters", () => {
         burnBps: 7000, // 70% of monster purchases burned, 30% to fee wallet
         battleFeeBps: 250, // 2.5% rake on battle loot
         marketFeeBps: 200, // 2% marketplace fee
+        metadataBaseUri:
+          "https://raw.githubusercontent.com/scorched-osu/MINI-HUNGRY-MONSTERS/main/assets/metadata/",
         monsterPriceMhm: new BN(100_000_000), // 100 MHM
         genesisPriceLamports: new BN(0.1 * LAMPORTS_PER_SOL),
         genesisRemaining: 1000,

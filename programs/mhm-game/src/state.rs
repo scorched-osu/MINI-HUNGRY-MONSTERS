@@ -48,6 +48,17 @@ impl Rarity {
             _ => Rarity::Unique,
         }
     }
+
+    /// Lowercase slug used to build the metadata URI.
+    pub fn slug(&self) -> &'static str {
+        match self {
+            Rarity::Standard => "standard",
+            Rarity::Rare => "rare",
+            Rarity::Epic => "epic",
+            Rarity::Legendary => "legendary",
+            Rarity::Unique => "unique",
+        }
+    }
 }
 
 /// Global game configuration. Single PDA, seeded by [CONFIG_SEED].
@@ -81,6 +92,10 @@ pub struct GameConfig {
     pub mining_rate_ranges: [[u64; 2]; NUM_RARITIES],
     /// Rarity roll weights in basis points (must sum to 10_000).
     pub rarity_weights_bps: [u16; NUM_RARITIES],
+    /// Base URI for NFT metadata; the rarity slug + ".json" is appended
+    /// (e.g. "<base>/epic.json"). Tunable via update_config.
+    #[max_len(160)]
+    pub metadata_base_uri: String,
     /// Total monsters ever minted (also used as the next monster id).
     pub monsters_minted: u64,
     /// Total battles ever created (also used as the next battle id).

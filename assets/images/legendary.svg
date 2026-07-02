@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
+  <rect width="400" height="400" rx="32" fill="#12142a"/>
+  <circle cx="200" cy="215" r="150" fill="#e8b830" opacity="0.25"><animate attributeName="opacity" values="0.15;0.35;0.15" dur="3s" repeatCount="indefinite"/></circle>
+  <!-- body -->
+  <path d="M200 80 C 110 80 80 160 80 230 C 80 310 130 340 200 340 C 270 340 320 310 320 230 C 320 160 290 80 200 80 Z" fill="#e8b830"/>
+  <ellipse cx="200" cy="285" rx="80" ry="45" fill="#f5d97a"/>
+  <!-- horns -->
+  <path d="M135 95 L 120 45 L 165 78 Z" fill="#e8b830"/>
+  <path d="M265 95 L 280 45 L 235 78 Z" fill="#e8b830"/>
+  <!-- eyes -->
+  <circle cx="155" cy="175" r="26" fill="white"/>
+  <circle cx="245" cy="175" r="26" fill="white"/>
+  <circle cx="160" cy="180" r="12" fill="#3d2e05"/>
+  <circle cx="240" cy="180" r="12" fill="#3d2e05"/>
+  <!-- hungry mouth -->
+  <path d="M140 235 Q 200 290 260 235 Q 200 265 140 235 Z" fill="#3d2e05"/>
+  <path d="M155 241 L 165 258 L 175 244 Z" fill="white"/>
+  <path d="M225 244 L 235 258 L 245 241 Z" fill="white"/>
+  <!-- arms -->
+  <path d="M85 220 Q 55 235 62 265 Q 85 258 95 240 Z" fill="#e8b830"/>
+  <path d="M315 220 Q 345 235 338 265 Q 315 258 305 240 Z" fill="#e8b830"/>
+  <text x="200" y="378" text-anchor="middle" font-family="monospace" font-size="20" fill="#f5d97a" letter-spacing="4">LEGENDARY</text>
+</svg>

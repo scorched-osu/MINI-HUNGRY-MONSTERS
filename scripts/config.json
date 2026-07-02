@@ -17,6 +17,7 @@
   "burnBps": 7000,
   "battleFeeBps": 250,
   "marketFeeBps": 200,
+  "metadataBaseUri": "https://raw.githubusercontent.com/scorched-osu/MINI-HUNGRY-MONSTERS/main/assets/metadata/",
   "monsterPriceMhm": 100000000,
   "genesisPriceLamports": 100000000,
   "genesisRemaining": 1000,

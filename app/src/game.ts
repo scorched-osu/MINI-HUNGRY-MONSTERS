@@ -24,6 +24,9 @@ import idl from './idl/mhm_game.json'
 
 export const PROGRAM_ID = new PublicKey((idl as Idl).address)
 export const MICRO = 1_000_000 // 1 MHM = 1_000_000 micro-MHM
+export const TOKEN_METADATA_PROGRAM_ID = new PublicKey(
+  'metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s',
+)
 
 // ---------- account shapes (as decoded by Anchor) ----------
 
@@ -106,6 +109,11 @@ export const battlePda = (id: BN | number) =>
   PublicKey.findProgramAddressSync([Buffer.from('battle'), le8(id)], PROGRAM_ID)[0]
 export const listingPda = (mint: PublicKey) =>
   PublicKey.findProgramAddressSync([Buffer.from('listing'), mint.toBuffer()], PROGRAM_ID)[0]
+export const metadataPda = (mint: PublicKey) =>
+  PublicKey.findProgramAddressSync(
+    [Buffer.from('metadata'), TOKEN_METADATA_PROGRAM_ID.toBuffer(), mint.toBuffer()],
+    TOKEN_METADATA_PROGRAM_ID,
+  )[0]
 
 // ---------- program ----------
 
@@ -181,10 +189,12 @@ export async function hatchGenesis(program: Program, payer: PublicKey, config: G
       monsterMint: mint,
       monster: monsterPda(mint),
       monsterToken: getAssociatedTokenAddressSync(mint, payer),
+      metadata: metadataPda(mint),
       payer,
       feeWallet: config.feeWallet,
       systemProgram: SystemProgram.programId,
       tokenProgram: TOKEN_PROGRAM_ID,
+      tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
       associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
       rent: SYSVAR_RENT_PUBKEY,
     })
@@ -206,9 +216,11 @@ export async function buyMonster(program: Program, payer: PublicKey, config: Gam
       monsterMint: mint,
       monster: monsterPda(mint),
       monsterToken: getAssociatedTokenAddressSync(mint, payer),
+      metadata: metadataPda(mint),
       payer,
       systemProgram: SystemProgram.programId,
       tokenProgram: TOKEN_PROGRAM_ID,
+      tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
       associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
       rent: SYSVAR_RENT_PUBKEY,
     })

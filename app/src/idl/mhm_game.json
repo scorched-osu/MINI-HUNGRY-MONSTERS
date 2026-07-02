@@ -1139,6 +1139,42 @@
           }
         },
         {
+          "name": "metadata",
+          "docs": [
+            "canonical metadata PDA for the monster mint."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  116,
+                  97,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token_metadata_program"
+              },
+              {
+                "kind": "account",
+                "path": "monster_mint"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "token_metadata_program"
+            }
+          }
+        },
+        {
           "name": "payer",
           "writable": true,
           "signer": true
@@ -1150,6 +1186,10 @@
         {
           "name": "token_program",
           "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "token_metadata_program",
+          "address": "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
         },
         {
           "name": "associated_token_program",
@@ -1974,6 +2014,42 @@
           }
         },
         {
+          "name": "metadata",
+          "docs": [
+            "canonical metadata PDA for the monster mint."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  116,
+                  97,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token_metadata_program"
+              },
+              {
+                "kind": "account",
+                "path": "monster_mint"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "token_metadata_program"
+            }
+          }
+        },
+        {
           "name": "payer",
           "writable": true,
           "signer": true
@@ -1989,6 +2065,10 @@
         {
           "name": "token_program",
           "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "token_metadata_program",
+          "address": "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
         },
         {
           "name": "associated_token_program",
@@ -2911,21 +2991,26 @@
     },
     {
       "code": 6026,
+      "name": "UriTooLong",
+      "msg": "Metadata base URI is too long (max 160 bytes)"
+    },
+    {
+      "code": 6027,
       "name": "BadPrice",
       "msg": "Listing price must be greater than zero"
     },
     {
-      "code": 6027,
+      "code": 6028,
       "name": "NotSeller",
       "msg": "Only the seller can cancel this listing"
     },
     {
-      "code": 6028,
+      "code": 6029,
       "name": "Unauthorized",
       "msg": "Unauthorized: admin only"
     },
     {
-      "code": 6029,
+      "code": 6030,
       "name": "Overflow",
       "msg": "Arithmetic overflow"
     }
@@ -3299,6 +3384,14 @@
             }
           },
           {
+            "name": "metadata_base_uri",
+            "docs": [
+              "Base URI for NFT metadata; the rarity slug + \".json\" is appended",
+              "(e.g. \"<base>/epic.json\"). Tunable via update_config."
+            ],
+            "type": "string"
+          },
+          {
             "name": "monsters_minted",
             "docs": [
               "Total monsters ever minted (also used as the next monster id)."
@@ -3355,6 +3448,13 @@
               "Fee on marketplace sales, in basis points."
             ],
             "type": "u16"
+          },
+          {
+            "name": "metadata_base_uri",
+            "docs": [
+              "Base URI for NFT metadata (should end with '/'); \"<rarity>.json\" is appended."
+            ],
+            "type": "string"
           },
           {
             "name": "monster_price_mhm",
@@ -3759,6 +3859,12 @@
             "name": "market_fee_bps",
             "type": {
               "option": "u16"
+            }
+          },
+          {
+            "name": "metadata_base_uri",
+            "type": {
+              "option": "string"
             }
           },
           {

@@ -15,6 +15,10 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::{program::invoke, system_instruction};
 use anchor_spl::associated_token::AssociatedToken;
+use anchor_spl::metadata::{
+    create_metadata_accounts_v3, mpl_token_metadata::types::DataV2, CreateMetadataAccountsV3,
+    Metadata as TokenMetadata,
+};
 use anchor_spl::token::spl_token::instruction::AuthorityType;
 use anchor_spl::token::{
     self, Burn, CloseAccount, Mint, MintTo, SetAuthority, Token, TokenAccount, Transfer,
@@ -57,6 +61,7 @@ pub mod mhm_game {
         require!(params.burn_bps <= 10_000, MhmError::BadBps);
         require!(params.battle_fee_bps <= 10_000, MhmError::BadBps);
         require!(params.market_fee_bps <= 10_000, MhmError::BadBps);
+        require!(params.metadata_base_uri.len() <= 160, MhmError::UriTooLong);
 
         let config = &mut ctx.accounts.config;
         config.admin = ctx.accounts.admin.key();
@@ -65,6 +70,7 @@ pub mod mhm_game {
         config.burn_bps = params.burn_bps;
         config.battle_fee_bps = params.battle_fee_bps;
         config.market_fee_bps = params.market_fee_bps;
+        config.metadata_base_uri = params.metadata_base_uri;
         config.monster_price_mhm = params.monster_price_mhm;
         config.genesis_price_lamports = params.genesis_price_lamports;
         config.genesis_remaining = params.genesis_remaining;
@@ -115,6 +121,10 @@ pub mod mhm_game {
         if let Some(market_fee_bps) = params.market_fee_bps {
             require!(market_fee_bps <= 10_000, MhmError::BadBps);
             config.market_fee_bps = market_fee_bps;
+        }
+        if let Some(metadata_base_uri) = params.metadata_base_uri {
+            require!(metadata_base_uri.len() <= 160, MhmError::UriTooLong);
+            config.metadata_base_uri = metadata_base_uri;
         }
         if let Some(paused) = params.paused {
             config.paused = paused;
@@ -173,8 +183,12 @@ pub mod mhm_game {
             ctx.bumps.monster,
             &ctx.accounts.monster_mint,
             &ctx.accounts.monster_token,
+            &ctx.accounts.metadata,
             &ctx.accounts.payer,
             &ctx.accounts.token_program,
+            &ctx.accounts.token_metadata_program,
+            &ctx.accounts.system_program,
+            &ctx.accounts.rent,
         )
     }
 
@@ -222,8 +236,12 @@ pub mod mhm_game {
             ctx.bumps.monster,
             &ctx.accounts.monster_mint,
             &ctx.accounts.monster_token,
+            &ctx.accounts.metadata,
             &ctx.accounts.payer,
             &ctx.accounts.token_program,
+            &ctx.accounts.token_metadata_program,
+            &ctx.accounts.system_program,
+            &ctx.accounts.rent,
         )
     }
 
@@ -689,14 +707,19 @@ pub mod mhm_game {
 
 /// Roll rarity + stats and mint the NFT to the payer. Shared by genesis
 /// hatches and MHM purchases.
+#[allow(clippy::too_many_arguments)]
 fn mint_monster<'info>(
     config: &mut Account<'info, GameConfig>,
     monster: &mut Account<'info, Monster>,
     monster_bump: u8,
     monster_mint: &Account<'info, Mint>,
     monster_token: &Account<'info, TokenAccount>,
+    metadata: &UncheckedAccount<'info>,
     payer: &Signer<'info>,
     token_program: &Program<'info, Token>,
+    token_metadata_program: &Program<'info, TokenMetadata>,
+    system_program: &Program<'info, System>,
+    rent: &Sysvar<'info, Rent>,
 ) -> Result<()> {
     let clock = Clock::get()?;
     let mut roll = Roll::new(&clock, &payer.key(), config.monsters_minted);
@@ -735,8 +758,9 @@ fn mint_monster<'info>(
 
     config.monsters_minted += 1;
 
-    // Mint exactly 1 NFT token to the payer, then permanently revoke the
-    // mint authority so supply is fixed at 1 forever.
+    // Mint exactly 1 NFT token to the payer, attach Metaplex metadata (name,
+    // symbol, rarity artwork), then permanently revoke the mint authority so
+    // supply is fixed at 1 forever.
     let bump = config.bump;
     let signer_seeds: &[&[&[u8]]] = &[&[CONFIG_SEED, &[bump]]];
     token::mint_to(
@@ -750,6 +774,33 @@ fn mint_monster<'info>(
             signer_seeds,
         ),
         1,
+    )?;
+    create_metadata_accounts_v3(
+        CpiContext::new_with_signer(
+            token_metadata_program.to_account_info(),
+            CreateMetadataAccountsV3 {
+                metadata: metadata.to_account_info(),
+                mint: monster_mint.to_account_info(),
+                mint_authority: config.to_account_info(),
+                payer: payer.to_account_info(),
+                update_authority: config.to_account_info(),
+                system_program: system_program.to_account_info(),
+                rent: rent.to_account_info(),
+            },
+            signer_seeds,
+        ),
+        DataV2 {
+            name: format!("Mini Hungry Monster #{}", monster.id),
+            symbol: "MHM".to_string(),
+            uri: format!("{}{}.json", config.metadata_base_uri, rarity.slug()),
+            seller_fee_basis_points: 0,
+            creators: None,
+            collection: None,
+            uses: None,
+        },
+        true, // is_mutable: allow fixing URIs via a future update
+        true, // update_authority (config PDA) is a signer
+        None,
     )?;
     token::set_authority(
         CpiContext::new_with_signer(
@@ -791,6 +842,8 @@ pub struct InitializeParams {
     pub battle_fee_bps: u16,
     /// Fee on marketplace sales, in basis points.
     pub market_fee_bps: u16,
+    /// Base URI for NFT metadata (should end with '/'); "<rarity>.json" is appended.
+    pub metadata_base_uri: String,
     pub monster_price_mhm: u64,
     pub genesis_price_lamports: u64,
     pub genesis_remaining: u32,
@@ -804,6 +857,7 @@ pub struct UpdateConfigParams {
     pub burn_bps: Option<u16>,
     pub battle_fee_bps: Option<u16>,
     pub market_fee_bps: Option<u16>,
+    pub metadata_base_uri: Option<String>,
     pub monster_price_mhm: Option<u64>,
     pub genesis_price_lamports: Option<u64>,
     pub genesis_remaining: Option<u32>,
@@ -884,6 +938,16 @@ pub struct HatchGenesis<'info> {
     )]
     pub monster_token: Account<'info, TokenAccount>,
 
+    /// CHECK: created by the token metadata program via CPI; address is the
+    /// canonical metadata PDA for the monster mint.
+    #[account(
+        mut,
+        seeds = [b"metadata", token_metadata_program.key().as_ref(), monster_mint.key().as_ref()],
+        seeds::program = token_metadata_program.key(),
+        bump,
+    )]
+    pub metadata: UncheckedAccount<'info>,
+
     #[account(mut)]
     pub payer: Signer<'info>,
 
@@ -893,6 +957,7 @@ pub struct HatchGenesis<'info> {
 
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
+    pub token_metadata_program: Program<'info, TokenMetadata>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub rent: Sysvar<'info, Rent>,
 }
@@ -953,11 +1018,22 @@ pub struct BuyMonster<'info> {
     )]
     pub monster_token: Account<'info, TokenAccount>,
 
+    /// CHECK: created by the token metadata program via CPI; address is the
+    /// canonical metadata PDA for the monster mint.
+    #[account(
+        mut,
+        seeds = [b"metadata", token_metadata_program.key().as_ref(), monster_mint.key().as_ref()],
+        seeds::program = token_metadata_program.key(),
+        bump,
+    )]
+    pub metadata: UncheckedAccount<'info>,
+
     #[account(mut)]
     pub payer: Signer<'info>,
 
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
+    pub token_metadata_program: Program<'info, TokenMetadata>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub rent: Sysvar<'info, Rent>,
 }

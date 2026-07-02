@@ -64,6 +64,7 @@ async function main() {
       burnBps: cfg.burnBps,
       battleFeeBps: cfg.battleFeeBps,
       marketFeeBps: cfg.marketFeeBps,
+      metadataBaseUri: cfg.metadataBaseUri,
       monsterPriceMhm: new BN(cfg.monsterPriceMhm),
       genesisPriceLamports: new BN(cfg.genesisPriceLamports),
       genesisRemaining: cfg.genesisRemaining,

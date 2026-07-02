@@ -16,3 +16,19 @@ jobs:
         run: cargo check -p mhm-game
       - name: Combat engine unit tests
         run: cargo test -p mhm-game --lib
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - name: Install app dependencies
+        run: npm ci
+        working-directory: app
+      - name: Type-check and build app
+        run: npm run build
+        working-directory: app

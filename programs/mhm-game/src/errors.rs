@@ -54,6 +54,8 @@ pub enum MhmError {
     BadFeeAccount,
     #[msg("Missing fee token account")]
     MissingFeeAccount,
+    #[msg("Metadata base URI is too long (max 160 bytes)")]
+    UriTooLong,
     #[msg("Listing price must be greater than zero")]
     BadPrice,
     #[msg("Only the seller can cancel this listing")]

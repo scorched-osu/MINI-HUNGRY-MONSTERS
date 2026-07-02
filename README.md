@@ -99,8 +99,11 @@ solana config set --url localhost
 #    rewrites declare_id + Anchor.toml to match, then rebuild)
 anchor build && anchor keys sync && anchor build
 
-# 2. Terminal 2: local validator
-solana-test-validator
+# 2. Terminal 2: local validator (cloning Metaplex Token Metadata, which
+#    monster minting CPIs into — needs internet the first time)
+solana-test-validator \
+  --clone metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s \
+  --url https://api.mainnet-beta.solana.com
 
 # 3. Deploy + initialize (fund your CLI wallet first)
 solana airdrop 10
@@ -156,8 +159,9 @@ the app uses: `anchor idl build --program-name mhm_game -o app/src/idl/mhm_game.
 
 - **Randomness**: mint rolls use clock/slot-derived pseudo-randomness — fine
   for devnet, grindable on mainnet. Swap `rng.rs` for Switchboard VRF.
-- **Metadata**: monsters are plain SPL NFTs; add Metaplex Token Metadata for
-  images/marketplace display.
+- **Artwork/metadata hosting**: monsters mint with Metaplex metadata pointing
+  at placeholder art in `assets/` served from GitHub; move to Arweave/IPFS
+  and real art for mainnet.
 - **Audit**: this program moves value and has not been audited.
 
 See [docs/GAME_DESIGN.md](docs/GAME_DESIGN.md) and
