@@ -29,6 +29,7 @@ pub mod combat;
 pub mod errors;
 pub mod rng;
 pub mod state;
+pub mod traits;
 
 use actions::{get_action, ActionSlot};
 use errors::MhmError;
@@ -36,15 +37,6 @@ use rng::Roll;
 use state::*;
 
 declare_id!("594wvdBsGrU6g6LswPmsx7tk1Cc7fgrpDAxvF8CEWq9K");
-
-/// Base battle stats per rarity tier (Standard..Unique); a random bonus is
-/// rolled on top at mint time.
-const BASE_MAX_HP: [u32; NUM_RARITIES] = [100, 130, 170, 220, 300];
-const BASE_POWER: [u32; NUM_RARITIES] = [50, 65, 85, 110, 150];
-const BASE_DEFENSE: [u32; NUM_RARITIES] = [20, 30, 45, 65, 90];
-const HP_ROLL: u32 = 20;
-const POWER_ROLL: u32 = 15;
-const DEFENSE_ROLL: u32 = 10;
 
 #[program]
 pub mod mhm_game {
@@ -722,34 +714,25 @@ fn mint_monster<'info>(
     rent: &Sysvar<'info, Rent>,
 ) -> Result<()> {
     let clock = Clock::get()?;
-    let mut roll = Roll::new(&clock, &payer.key(), config.monsters_minted);
-
-    // Weighted rarity roll.
-    let pick = roll.bps();
-    let mut cumulative: u16 = 0;
-    let mut rarity_index = NUM_RARITIES - 1;
-    for (i, weight) in config.rarity_weights_bps.iter().enumerate() {
-        cumulative = cumulative.saturating_add(*weight);
-        if pick < cumulative {
-            rarity_index = i;
-            break;
-        }
-    }
-    let rarity = Rarity::from_index(rarity_index);
-
-    // Mining speed from the tier's configured range.
-    let range = config.mining_rate_ranges[rarity_index];
-    let mining_rate = roll.range_u64(range[0], range[1]);
+    // Entropy seam: today the seed is clock/minter-derived (see the security
+    // note in rng.rs); swapping in a VRF / commit-reveal seed is a change here
+    // only — roll_traits is a pure function of the seed.
+    let seed = Roll::new(&clock, &payer.key(), config.monsters_minted).seed();
+    let traits = traits::roll_traits(
+        seed,
+        &config.mining_rate_ranges,
+        &config.rarity_weights_bps,
+    );
 
     monster.mint = monster_mint.key();
     monster.id = config.monsters_minted;
-    monster.rarity = rarity;
-    monster.mining_rate = mining_rate;
+    monster.rarity = traits.rarity;
+    monster.mining_rate = traits.mining_rate;
     monster.last_settled_ts = clock.unix_timestamp;
     monster.unclaimed = 0;
-    monster.max_hp = BASE_MAX_HP[rarity_index] + roll.range_u32(0, HP_ROLL);
-    monster.power = BASE_POWER[rarity_index] + roll.range_u32(0, POWER_ROLL);
-    monster.defense = BASE_DEFENSE[rarity_index] + roll.range_u32(0, DEFENSE_ROLL);
+    monster.max_hp = traits.max_hp;
+    monster.power = traits.power;
+    monster.defense = traits.defense;
     monster.wins = 0;
     monster.losses = 0;
     monster.in_battle = false;
@@ -792,7 +775,7 @@ fn mint_monster<'info>(
         DataV2 {
             name: format!("Mini Hungry Monster #{}", monster.id),
             symbol: "MHM".to_string(),
-            uri: format!("{}{}.json", config.metadata_base_uri, rarity.slug()),
+            uri: format!("{}{}.json", config.metadata_base_uri, traits.rarity.slug()),
             seller_fee_basis_points: 0,
             creators: None,
             collection: None,
@@ -820,7 +803,7 @@ fn mint_monster<'info>(
         owner: payer.key(),
         id: monster.id,
         rarity: monster.rarity,
-        mining_rate,
+        mining_rate: monster.mining_rate,
         max_hp: monster.max_hp,
         power: monster.power,
         defense: monster.defense,

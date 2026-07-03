@@ -11,6 +11,9 @@ mhm_game = "594wvdBsGrU6g6LswPmsx7tk1Cc7fgrpDAxvF8CEWq9K"
 [programs.devnet]
 mhm_game = "594wvdBsGrU6g6LswPmsx7tk1Cc7fgrpDAxvF8CEWq9K"
 
+[programs.mainnet]
+mhm_game = "594wvdBsGrU6g6LswPmsx7tk1Cc7fgrpDAxvF8CEWq9K"
+
 [registry]
 url = "https://api.apr.dev"
 

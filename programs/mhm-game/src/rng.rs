@@ -15,6 +15,13 @@ pub struct Roll {
 }
 
 impl Roll {
+    /// Build a roll from a raw 32-byte entropy seed. This is the seam a real
+    /// randomness source (VRF / commit-reveal) plugs into — everything
+    /// downstream (rarity, stats) is a deterministic function of these bytes.
+    pub fn from_seed(seed: [u8; 32]) -> Self {
+        Roll { bytes: seed, cursor: 0 }
+    }
+
     pub fn new(clock: &Clock, minter: &Pubkey, counter: u64) -> Self {
         let hash = keccak::hashv(&[
             &clock.slot.to_le_bytes(),
@@ -22,7 +29,12 @@ impl Roll {
             minter.as_ref(),
             &counter.to_le_bytes(),
         ]);
-        Roll { bytes: hash.to_bytes(), cursor: 0 }
+        Roll::from_seed(hash.to_bytes())
+    }
+
+    /// The raw 32-byte entropy seed backing this roll.
+    pub fn seed(&self) -> [u8; 32] {
+        self.bytes
     }
 
     fn next_u64(&mut self) -> u64 {
