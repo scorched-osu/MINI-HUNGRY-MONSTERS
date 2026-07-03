@@ -80,6 +80,13 @@ describe("mini-hungry-monsters", () => {
     [new BN(18_000_000_000), new BN(21_600_000_000)],
   ];
 
+  const pendingPda = (id: number) =>
+    PublicKey.findProgramAddressSync(
+      [Buffer.from("pending"), new BN(id).toArrayLike(Buffer, "le", 8)],
+      program.programId
+    )[0];
+
+  // Commit -> wait for the reveal slot -> reveal.
   async function hatch(payer: Keypair): Promise<{
     mint: PublicKey;
     monster: PublicKey;
@@ -90,25 +97,54 @@ describe("mini-hungry-monsters", () => {
     const mint = monsterMintPda(id);
     const monster = monsterPda(mint);
     const token = getAssociatedTokenAddressSync(mint, payer.publicKey);
+
     await program.methods
-      .hatchGenesis(new BN(id))
+      .commitHatchGenesis(new BN(id))
       .accounts({
         config: configPda,
         monsterMint: mint,
-        monster,
-        monsterToken: token,
-        metadata: metadataPda(mint),
+        pending: pendingPda(id),
         payer: payer.publicKey,
         feeWallet: feeWallet.publicKey,
         systemProgram: SystemProgram.programId,
         tokenProgram: TOKEN_PROGRAM_ID,
-        tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
-        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
         rent: SYSVAR_RENT_PUBKEY,
       })
       .signers([payer])
       .rpc();
-    return { mint, monster, token };
+
+    // Give the target slot (commit_slot + REVEAL_DELAY_SLOTS) time to appear.
+    for (let i = 0; i < 20; i++) {
+      try {
+        await program.methods
+          .revealMonster()
+          .accounts({
+            config: configPda,
+            pending: pendingPda(id),
+            monsterMint: mint,
+            monster,
+            monsterToken: token,
+            metadata: metadataPda(mint),
+            slotHashes: anchor.web3.SYSVAR_SLOT_HASHES_PUBKEY,
+            payer: payer.publicKey,
+            systemProgram: SystemProgram.programId,
+            tokenProgram: TOKEN_PROGRAM_ID,
+            tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
+            associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+            rent: SYSVAR_RENT_PUBKEY,
+          })
+          .signers([payer])
+          .rpc();
+        return { mint, monster, token };
+      } catch (e) {
+        if (String(e).includes("RevealTooEarly")) {
+          await new Promise((r) => setTimeout(r, 500));
+          continue;
+        }
+        throw e;
+      }
+    }
+    throw new Error("reveal never became available");
   }
 
   let monsterA: Awaited<ReturnType<typeof hatch>>;

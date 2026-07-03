@@ -56,6 +56,14 @@ pub enum MhmError {
     MissingFeeAccount,
     #[msg("Metadata base URI is too long (max 160 bytes)")]
     UriTooLong,
+    #[msg("The reveal slot has not been produced yet; try again shortly")]
+    RevealTooEarly,
+    #[msg("The reveal slot's hash is no longer available; this hatch has expired")]
+    RevealExpired,
+    #[msg("Pending mint does not match the provided monster mint")]
+    PendingMintMismatch,
+    #[msg("Invalid SlotHashes sysvar account")]
+    BadSlotHashes,
     #[msg("Listing price must be greater than zero")]
     BadPrice,
     #[msg("Only the seller can cancel this listing")]

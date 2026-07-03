@@ -33,7 +33,6 @@ pub mod traits;
 
 use actions::{get_action, ActionSlot};
 use errors::MhmError;
-use rng::Roll;
 use state::*;
 
 declare_id!("594wvdBsGrU6g6LswPmsx7tk1Cc7fgrpDAxvF8CEWq9K");
@@ -145,9 +144,12 @@ pub mod mhm_game {
         Ok(())
     }
 
-    /// Genesis hatch: buy a monster for SOL. This bootstraps the economy
-    /// before any MHM circulates; supply is capped by `genesis_remaining`.
-    pub fn hatch_genesis(ctx: Context<HatchGenesis>, monster_id: u64) -> Result<()> {
+    /// Genesis hatch, step 1 of 2: pay SOL and commit. This bootstraps the
+    /// economy before any MHM circulates; supply is capped by
+    /// `genesis_remaining`. The monster's traits are NOT decided here — they
+    /// are sealed to a future slot's hash and revealed by `reveal_monster`,
+    /// which prevents rarity grinding.
+    pub fn commit_hatch_genesis(ctx: Context<CommitHatchGenesis>, monster_id: u64) -> Result<()> {
         let config = &ctx.accounts.config;
         require!(!config.paused, MhmError::GamePaused);
         require!(config.genesis_remaining > 0, MhmError::GenesisSoldOut);
@@ -168,25 +170,21 @@ pub mod mhm_game {
             )?;
         }
 
-        ctx.accounts.config.genesis_remaining -= 1;
-        mint_monster(
-            &mut ctx.accounts.config,
-            &mut ctx.accounts.monster,
-            ctx.bumps.monster,
+        let config = &mut ctx.accounts.config;
+        config.genesis_remaining -= 1;
+        open_pending_mint(
+            config,
+            &mut ctx.accounts.pending,
+            ctx.bumps.pending,
             &ctx.accounts.monster_mint,
-            &ctx.accounts.monster_token,
-            &ctx.accounts.metadata,
             &ctx.accounts.payer,
-            &ctx.accounts.token_program,
-            &ctx.accounts.token_metadata_program,
-            &ctx.accounts.system_program,
-            &ctx.accounts.rent,
         )
     }
 
-    /// Buy a monster with MHM coin. `burn_bps` of the price is burned
-    /// (deflationary sink); the rest goes to the fee wallet.
-    pub fn buy_monster(ctx: Context<BuyMonster>, monster_id: u64) -> Result<()> {
+    /// Buy a monster with MHM, step 1 of 2: pay and commit. `burn_bps` of the
+    /// price is burned (deflationary sink); the rest goes to the fee wallet.
+    /// Traits are revealed later by `reveal_monster`.
+    pub fn commit_buy_monster(ctx: Context<CommitBuyMonster>, monster_id: u64) -> Result<()> {
         let config = &ctx.accounts.config;
         require!(!config.paused, MhmError::GamePaused);
         require!(monster_id == config.monsters_minted, MhmError::Overflow);
@@ -222,10 +220,65 @@ pub mod mhm_game {
             )?;
         }
 
-        mint_monster(
+        open_pending_mint(
             &mut ctx.accounts.config,
+            &mut ctx.accounts.pending,
+            ctx.bumps.pending,
+            &ctx.accounts.monster_mint,
+            &ctx.accounts.payer,
+        )
+    }
+
+    /// Hatch step 2 of 2: reveal a committed monster's traits and mint the NFT.
+    ///
+    /// Seeds the roll from the hash of the committed `target_slot` (produced
+    /// after the commit, so unpredictable at payment time), then rolls rarity
+    /// and stats, mints the single NFT to the minter, attaches metadata, and
+    /// revokes the mint authority. Permissionless once the slot is available,
+    /// but only the original minter receives the NFT. If the reveal window
+    /// (~512 slots) is missed the hatch expires and the payment is forfeit.
+    pub fn reveal_monster(ctx: Context<RevealMonster>) -> Result<()> {
+        let clock = Clock::get()?;
+        let pending = &ctx.accounts.pending;
+        require!(
+            pending.monster_mint == ctx.accounts.monster_mint.key(),
+            MhmError::PendingMintMismatch
+        );
+
+        // Fetch the committed slot's hash from the SlotHashes sysvar.
+        let data = ctx.accounts.slot_hashes.try_borrow_data()?;
+        let slot_hash = match rng::slot_hash_for(&data, pending.target_slot) {
+            Some(h) => h,
+            None => {
+                // Not present: either the slot's hash does not exist yet, or it
+                // aged out of the buffer. A slot's hash only enters SlotHashes
+                // once the chain is strictly past it, so anything up to and
+                // including target_slot is still "too early"; only beyond it can
+                // a missing entry mean the reveal window was missed.
+                require!(
+                    clock.slot > pending.target_slot,
+                    MhmError::RevealTooEarly
+                );
+                return err!(MhmError::RevealExpired);
+            }
+        };
+        drop(data);
+
+        let seed = rng::reveal_seed(&slot_hash, &pending.minter, pending.monster_id);
+        let traits = traits::roll_traits(
+            seed,
+            &ctx.accounts.config.mining_rate_ranges,
+            &ctx.accounts.config.rarity_weights_bps,
+        );
+
+        finalize_monster(
+            &ctx.accounts.config,
             &mut ctx.accounts.monster,
             ctx.bumps.monster,
+            pending.monster_id,
+            pending.minter,
+            &traits,
+            clock.unix_timestamp,
             &ctx.accounts.monster_mint,
             &ctx.accounts.monster_token,
             &ctx.accounts.metadata,
@@ -697,13 +750,46 @@ pub mod mhm_game {
     }
 }
 
-/// Roll rarity + stats and mint the NFT to the payer. Shared by genesis
-/// hatches and MHM purchases.
-#[allow(clippy::too_many_arguments)]
-fn mint_monster<'info>(
+/// Commit step: reserve the monster id and seal the reveal to a future slot.
+/// The `monster_mint` account is created (authority = config) but no token is
+/// minted yet; traits are decided at reveal.
+fn open_pending_mint<'info>(
     config: &mut Account<'info, GameConfig>,
+    pending: &mut Account<'info, PendingMint>,
+    pending_bump: u8,
+    monster_mint: &Account<'info, Mint>,
+    payer: &Signer<'info>,
+) -> Result<()> {
+    let clock = Clock::get()?;
+    pending.minter = payer.key();
+    pending.monster_mint = monster_mint.key();
+    pending.monster_id = config.monsters_minted;
+    pending.target_slot = clock.slot + REVEAL_DELAY_SLOTS;
+    pending.bump = pending_bump;
+
+    config.monsters_minted += 1;
+
+    emit!(MonsterCommitted {
+        monster: monster_mint.key(),
+        minter: payer.key(),
+        monster_id: pending.monster_id,
+        target_slot: pending.target_slot,
+    });
+    Ok(())
+}
+
+/// Reveal step: write the rolled traits into the Monster account, mint the
+/// single NFT to the minter, attach Metaplex metadata, and permanently revoke
+/// the mint authority so supply is fixed at 1 forever.
+#[allow(clippy::too_many_arguments)]
+fn finalize_monster<'info>(
+    config: &Account<'info, GameConfig>,
     monster: &mut Account<'info, Monster>,
     monster_bump: u8,
+    monster_id: u64,
+    minter: Pubkey,
+    rolled: &traits::RolledTraits,
+    now: i64,
     monster_mint: &Account<'info, Mint>,
     monster_token: &Account<'info, TokenAccount>,
     metadata: &UncheckedAccount<'info>,
@@ -713,37 +799,21 @@ fn mint_monster<'info>(
     system_program: &Program<'info, System>,
     rent: &Sysvar<'info, Rent>,
 ) -> Result<()> {
-    let clock = Clock::get()?;
-    // Entropy seam: today the seed is clock/minter-derived (see the security
-    // note in rng.rs); swapping in a VRF / commit-reveal seed is a change here
-    // only — roll_traits is a pure function of the seed.
-    let seed = Roll::new(&clock, &payer.key(), config.monsters_minted).seed();
-    let traits = traits::roll_traits(
-        seed,
-        &config.mining_rate_ranges,
-        &config.rarity_weights_bps,
-    );
-
     monster.mint = monster_mint.key();
-    monster.id = config.monsters_minted;
-    monster.rarity = traits.rarity;
-    monster.mining_rate = traits.mining_rate;
-    monster.last_settled_ts = clock.unix_timestamp;
+    monster.id = monster_id;
+    monster.rarity = rolled.rarity;
+    monster.mining_rate = rolled.mining_rate;
+    monster.last_settled_ts = now;
     monster.unclaimed = 0;
-    monster.max_hp = traits.max_hp;
-    monster.power = traits.power;
-    monster.defense = traits.defense;
+    monster.max_hp = rolled.max_hp;
+    monster.power = rolled.power;
+    monster.defense = rolled.defense;
     monster.wins = 0;
     monster.losses = 0;
     monster.in_battle = false;
     monster.battle = Pubkey::default();
     monster.bump = monster_bump;
 
-    config.monsters_minted += 1;
-
-    // Mint exactly 1 NFT token to the payer, attach Metaplex metadata (name,
-    // symbol, rarity artwork), then permanently revoke the mint authority so
-    // supply is fixed at 1 forever.
     let bump = config.bump;
     let signer_seeds: &[&[&[u8]]] = &[&[CONFIG_SEED, &[bump]]];
     token::mint_to(
@@ -773,9 +843,9 @@ fn mint_monster<'info>(
             signer_seeds,
         ),
         DataV2 {
-            name: format!("Mini Hungry Monster #{}", monster.id),
+            name: format!("Mini Hungry Monster #{}", monster_id),
             symbol: "MHM".to_string(),
-            uri: format!("{}{}.json", config.metadata_base_uri, traits.rarity.slug()),
+            uri: format!("{}{}.json", config.metadata_base_uri, rolled.rarity.slug()),
             seller_fee_basis_points: 0,
             creators: None,
             collection: None,
@@ -800,13 +870,13 @@ fn mint_monster<'info>(
 
     emit!(MonsterMinted {
         monster: monster.mint,
-        owner: payer.key(),
-        id: monster.id,
-        rarity: monster.rarity,
-        mining_rate: monster.mining_rate,
-        max_hp: monster.max_hp,
-        power: monster.power,
-        defense: monster.defense,
+        owner: minter,
+        id: monster_id,
+        rarity: rolled.rarity,
+        mining_rate: rolled.mining_rate,
+        max_hp: rolled.max_hp,
+        power: rolled.power,
+        defense: rolled.defense,
     });
     Ok(())
 }
@@ -901,7 +971,7 @@ pub struct UpdateConfig<'info> {
 
 #[derive(Accounts)]
 #[instruction(monster_id: u64)]
-pub struct HatchGenesis<'info> {
+pub struct CommitHatchGenesis<'info> {
     #[account(mut, seeds = [CONFIG_SEED], bump = config.bump)]
     pub config: Account<'info, GameConfig>,
 
@@ -918,29 +988,11 @@ pub struct HatchGenesis<'info> {
     #[account(
         init,
         payer = payer,
-        space = 8 + Monster::INIT_SPACE,
-        seeds = [MONSTER_SEED, monster_mint.key().as_ref()],
+        space = 8 + PendingMint::INIT_SPACE,
+        seeds = [PENDING_SEED, monster_id.to_le_bytes().as_ref()],
         bump
     )]
-    pub monster: Account<'info, Monster>,
-
-    #[account(
-        init,
-        payer = payer,
-        associated_token::mint = monster_mint,
-        associated_token::authority = payer,
-    )]
-    pub monster_token: Account<'info, TokenAccount>,
-
-    /// CHECK: created by the token metadata program via CPI; address is the
-    /// canonical metadata PDA for the monster mint.
-    #[account(
-        mut,
-        seeds = [b"metadata", token_metadata_program.key().as_ref(), monster_mint.key().as_ref()],
-        seeds::program = token_metadata_program.key(),
-        bump,
-    )]
-    pub metadata: UncheckedAccount<'info>,
+    pub pending: Account<'info, PendingMint>,
 
     #[account(mut)]
     pub payer: Signer<'info>,
@@ -951,14 +1003,12 @@ pub struct HatchGenesis<'info> {
 
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
-    pub token_metadata_program: Program<'info, TokenMetadata>,
-    pub associated_token_program: Program<'info, AssociatedToken>,
     pub rent: Sysvar<'info, Rent>,
 }
 
 #[derive(Accounts)]
 #[instruction(monster_id: u64)]
-pub struct BuyMonster<'info> {
+pub struct CommitBuyMonster<'info> {
     #[account(mut, seeds = [CONFIG_SEED], bump = config.bump)]
     pub config: Account<'info, GameConfig>,
 
@@ -998,6 +1048,48 @@ pub struct BuyMonster<'info> {
     #[account(
         init,
         payer = payer,
+        space = 8 + PendingMint::INIT_SPACE,
+        seeds = [PENDING_SEED, monster_id.to_le_bytes().as_ref()],
+        bump
+    )]
+    pub pending: Account<'info, PendingMint>,
+
+    #[account(mut)]
+    pub payer: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+    pub token_program: Program<'info, Token>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    pub rent: Sysvar<'info, Rent>,
+}
+
+#[derive(Accounts)]
+pub struct RevealMonster<'info> {
+    #[account(seeds = [CONFIG_SEED], bump = config.bump)]
+    pub config: Account<'info, GameConfig>,
+
+    /// The committed hatch. Closed at the end, rent back to the minter.
+    /// Only the original minter may reveal (they receive the NFT).
+    #[account(
+        mut,
+        close = payer,
+        seeds = [PENDING_SEED, pending.monster_id.to_le_bytes().as_ref()],
+        bump = pending.bump,
+        constraint = pending.minter == payer.key() @ MhmError::NotMonsterHolder,
+    )]
+    pub pending: Account<'info, PendingMint>,
+
+    #[account(
+        mut,
+        seeds = [b"monster-mint", pending.monster_id.to_le_bytes().as_ref()],
+        bump,
+        address = pending.monster_mint,
+    )]
+    pub monster_mint: Account<'info, Mint>,
+
+    #[account(
+        init,
+        payer = payer,
         space = 8 + Monster::INIT_SPACE,
         seeds = [MONSTER_SEED, monster_mint.key().as_ref()],
         bump
@@ -1021,6 +1113,10 @@ pub struct BuyMonster<'info> {
         bump,
     )]
     pub metadata: UncheckedAccount<'info>,
+
+    /// CHECK: the SlotHashes sysvar, read to seed the roll. Address-checked.
+    #[account(address = anchor_lang::solana_program::sysvar::slot_hashes::ID)]
+    pub slot_hashes: UncheckedAccount<'info>,
 
     #[account(mut)]
     pub payer: Signer<'info>,
@@ -1408,6 +1504,14 @@ pub struct MonsterSold {
     pub buyer: Pubkey,
     pub price: u64,
     pub fee: u64,
+}
+
+#[event]
+pub struct MonsterCommitted {
+    pub monster: Pubkey,
+    pub minter: Pubkey,
+    pub monster_id: u64,
+    pub target_slot: u64,
 }
 
 #[event]

@@ -15,26 +15,26 @@ decision or resource that code cannot supply.
 - Fee routing to the configured fee wallet; admin launch allocations.
 - Combat engine + trait-generation covered by unit tests (`cargo test -p mhm-game --lib`).
 
-## 2. Randomness hardening — 🔴 needs a decision, then implementation + on-chain test
-The mint's rarity/stat roll is a **pure function of a 32-byte seed**
-(`programs/mhm-game/src/traits.rs`), and the seed is produced at a single
-seam (`Roll` in `rng.rs`). Today that seed is clock/slot/minter-derived,
-which a wrapper program can predict and grind (mint only when the roll is
-rare, abort the atomic transaction otherwise). This is the top pre-mainnet
-blocker. Two options — **pick one** (see the open question at the bottom):
+## 2. Randomness hardening — 🟡 commit–reveal implemented; needs on-chain test
+**Done:** the grindable single-transaction mint is replaced with an on-chain
+**commit–reveal** flow (`commit_hatch_genesis` / `commit_buy_monster` then
+`reveal_monster`). Payment is taken at commit; the roll is seeded from the hash
+of `commit_slot + 2` (via the SlotHashes sysvar), which does not exist at
+payment time — so the outcome can't be predicted or ground out by aborting an
+atomic transaction, and a paid commit can't be re-rolled. The rarity/stat
+derivation is a pure function of the seed (`programs/mhm-game/src/traits.rs`)
+with unit tests; the slot-hash parser and seed builder are unit-tested in
+`rng.rs`.
 
-- **A. Switchboard On-Demand VRF.** Gold standard. Adds a request/settle
-  two-transaction mint and a dependency on Switchboard's on-chain program.
-  Requires devnet Switchboard infra to test against.
-- **B. On-chain commit–reveal.** Self-contained: `commit` takes payment and
-  pins a future slot; `reveal` seeds the roll from that slot's `SlotHashes`
-  entry (unknowable at commit time, fixed once the slot exists). No external
-  dependency, but still a two-transaction mint.
-
-Either way the change is localized to the seed seam + a two-phase mint flow;
-`traits.rs` and its tests are unaffected. **Must be validated with
-`anchor test` on a local validator** (not possible in the cloud build
-environment — run locally per the README runbook).
+**Still to do (yours):**
+- **Validate with `anchor test`** on a local validator — the two-phase flow and
+  SlotHashes read can only be exercised on-chain, which the cloud build
+  environment can't do. The integration test in `tests/mhm-game.ts` already
+  drives commit→reveal; run it locally per the README runbook.
+- **Optional stronger guarantee:** a slot hash can in principle be biased by a
+  colluding block leader. For a high-value launch, swap the reveal seed for a
+  VRF (e.g. Switchboard On-Demand). This stays localized — only the seed fed to
+  `traits::roll_traits` changes; `traits.rs` and its tests are unaffected.
 
 ## 3. Artwork & metadata hosting — 🔴 needs real assets
 Current art is placeholder SVGs in `assets/` served from GitHub raw. For
@@ -86,7 +86,8 @@ with a funded authority. Automated agents will not perform it.
 
 ---
 
-### Open question for you
-Randomness approach for step 2 — **Switchboard VRF (external, battle-tested)**
-or **on-chain commit–reveal (self-contained, no dependency)**? This is the
-one architectural fork gating the last big piece of engineering.
+### Decision taken
+Randomness (step 2) uses **on-chain commit–reveal** — self-contained, no
+external dependency, and it fully removes the free atomic-abort grinding
+exploit. If you'd rather have the leader-collusion-resistant guarantee of
+**Switchboard VRF**, say so and it's a localized swap at the reveal seed.

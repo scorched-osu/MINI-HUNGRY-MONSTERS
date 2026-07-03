@@ -16,7 +16,11 @@ Each monster is an SPL NFT (supply 1) with an on-chain `Monster` account
 (PDA seeded by the mint) holding its game state. Ownership = holding the
 token, so monsters are freely tradable on any SPL marketplace.
 
-Rolled at mint time (pseudo-random; VRF planned for mainnet):
+Rolled at hatch time via a **commit–reveal** scheme (`commit_hatch_genesis` /
+`commit_buy_monster` then `reveal_monster`): payment is taken at commit and the
+roll is seeded from the hash of a slot a few slots in the future, so the
+outcome can't be predicted at payment time or ground out by aborting an atomic
+transaction. Traits:
 
 - **Rarity** — weighted roll, default 60/25/10/4/1% for
   STANDARD / RARE / EPIC / LEGENDARY / UNIQUE.
@@ -30,6 +34,25 @@ Rolled at mint time (pseudo-random; VRF planned for mainnet):
 | Epic | 170–190 | 85–100 | 45–55 |
 | Legendary | 220–240 | 110–125 | 65–75 |
 | Unique | 300–320 | 150–165 | 90–100 |
+
+## Hatching (commit–reveal)
+
+Two steps, defeating rarity grinding:
+
+1. **Commit** (`commit_hatch_genesis` for SOL / `commit_buy_monster` for MHM) —
+   takes payment, reserves the monster id + mint, and records
+   `target_slot = current_slot + 2`. No traits yet.
+2. **Reveal** (`reveal_monster`) — once `target_slot` exists, seeds the roll
+   from `keccak(slot_hash(target_slot), minter, monster_id)`, rolls rarity and
+   stats, mints the NFT to the minter, attaches metadata, revokes the mint
+   authority, and closes the pending record (rent back to the minter).
+
+Because `target_slot`'s hash doesn't exist at commit time, the outcome is
+unpredictable when you pay; because it's fixed once produced, a paid commit
+can't be re-rolled (abandoning it just forfeits payment). Reveal must happen
+within the SlotHashes window (~512 slots); miss it and the hatch expires. See
+`docs/MAINNET_CHECKLIST.md` for the note on upgrading to a VRF for the
+strongest (leader-collusion-resistant) guarantee.
 
 ## Idle mining
 

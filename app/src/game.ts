@@ -11,6 +11,7 @@ import {
   PublicKey,
   SystemProgram,
   SYSVAR_RENT_PUBKEY,
+  SYSVAR_SLOT_HASHES_PUBKEY,
   type Connection,
   type TransactionInstruction,
 } from '@solana/web3.js'
@@ -109,6 +110,8 @@ export const battlePda = (id: BN | number) =>
   PublicKey.findProgramAddressSync([Buffer.from('battle'), le8(id)], PROGRAM_ID)[0]
 export const listingPda = (mint: PublicKey) =>
   PublicKey.findProgramAddressSync([Buffer.from('listing'), mint.toBuffer()], PROGRAM_ID)[0]
+export const pendingPda = (id: BN | number) =>
+  PublicKey.findProgramAddressSync([Buffer.from('pending'), le8(id)], PROGRAM_ID)[0]
 export const metadataPda = (mint: PublicKey) =>
   PublicKey.findProgramAddressSync(
     [Buffer.from('metadata'), TOKEN_METADATA_PROGRAM_ID.toBuffer(), mint.toBuffer()],
@@ -179,19 +182,74 @@ export function formatMhm(micro: BN | number): string {
 
 // ---------- writes ----------
 
-export async function hatchGenesis(program: Program, payer: PublicKey, config: GameConfig) {
-  const id = config.monstersMinted
+// Hatching is commit -> reveal: pay + seal to a future slot, then reveal the
+// roll from that slot's hash (see programs/mhm-game/src/rng.rs). The high-level
+// `hatch` / `buyMonster` helpers below run both steps and wait for the slot.
+
+export async function commitHatchGenesis(
+  program: Program,
+  payer: PublicKey,
+  config: GameConfig,
+): Promise<number> {
+  const id = config.monstersMinted.toNumber()
   const mint = monsterMintPda(id)
-  return program.methods
-    .hatchGenesis(new BN(id))
+  await program.methods
+    .commitHatchGenesis(new BN(id))
     .accounts({
       config: configPda(),
+      monsterMint: mint,
+      pending: pendingPda(id),
+      payer,
+      feeWallet: config.feeWallet,
+      systemProgram: SystemProgram.programId,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      rent: SYSVAR_RENT_PUBKEY,
+    })
+    .rpc()
+  return id
+}
+
+export async function commitBuyMonster(
+  program: Program,
+  payer: PublicKey,
+  config: GameConfig,
+): Promise<number> {
+  const id = config.monstersMinted.toNumber()
+  const mint = monsterMintPda(id)
+  const mhmMint = mhmMintPda()
+  await program.methods
+    .commitBuyMonster(new BN(id))
+    .accounts({
+      config: configPda(),
+      mhmMint,
+      payerMhmAta: getAssociatedTokenAddressSync(mhmMint, payer),
+      feeWallet: config.feeWallet,
+      feeMhmAta: getAssociatedTokenAddressSync(mhmMint, config.feeWallet),
+      monsterMint: mint,
+      pending: pendingPda(id),
+      payer,
+      systemProgram: SystemProgram.programId,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+      rent: SYSVAR_RENT_PUBKEY,
+    })
+    .rpc()
+  return id
+}
+
+export async function revealMonster(program: Program, payer: PublicKey, monsterId: number) {
+  const mint = monsterMintPda(monsterId)
+  return program.methods
+    .revealMonster()
+    .accounts({
+      config: configPda(),
+      pending: pendingPda(monsterId),
       monsterMint: mint,
       monster: monsterPda(mint),
       monsterToken: getAssociatedTokenAddressSync(mint, payer),
       metadata: metadataPda(mint),
+      slotHashes: SYSVAR_SLOT_HASHES_PUBKEY,
       payer,
-      feeWallet: config.feeWallet,
       systemProgram: SystemProgram.programId,
       tokenProgram: TOKEN_PROGRAM_ID,
       tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
@@ -201,30 +259,34 @@ export async function hatchGenesis(program: Program, payer: PublicKey, config: G
     .rpc()
 }
 
+/** Reveal, retrying while the target slot has not been produced yet. */
+async function revealWithRetry(program: Program, payer: PublicKey, monsterId: number) {
+  for (let attempt = 0; attempt < 8; attempt++) {
+    try {
+      return await revealMonster(program, payer, monsterId)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      if (msg.includes('RevealTooEarly') && attempt < 7) {
+        await new Promise((r) => setTimeout(r, 800))
+        continue
+      }
+      throw e
+    }
+  }
+}
+
+/** Full genesis hatch: commit (pay SOL), wait for the reveal slot, reveal. */
+export async function hatchGenesis(program: Program, payer: PublicKey, config: GameConfig) {
+  const id = await commitHatchGenesis(program, payer, config)
+  await new Promise((r) => setTimeout(r, 1200))
+  return revealWithRetry(program, payer, id)
+}
+
+/** Full MHM purchase: commit (pay MHM), wait for the reveal slot, reveal. */
 export async function buyMonster(program: Program, payer: PublicKey, config: GameConfig) {
-  const id = config.monstersMinted
-  const mint = monsterMintPda(id)
-  const mhmMint = mhmMintPda()
-  return program.methods
-    .buyMonster(new BN(id))
-    .accounts({
-      config: configPda(),
-      mhmMint,
-      payerMhmAta: getAssociatedTokenAddressSync(mhmMint, payer),
-      feeWallet: config.feeWallet,
-      feeMhmAta: getAssociatedTokenAddressSync(mhmMint, config.feeWallet),
-      monsterMint: mint,
-      monster: monsterPda(mint),
-      monsterToken: getAssociatedTokenAddressSync(mint, payer),
-      metadata: metadataPda(mint),
-      payer,
-      systemProgram: SystemProgram.programId,
-      tokenProgram: TOKEN_PROGRAM_ID,
-      tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
-      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-      rent: SYSVAR_RENT_PUBKEY,
-    })
-    .rpc()
+  const id = await commitBuyMonster(program, payer, config)
+  await new Promise((r) => setTimeout(r, 1200))
+  return revealWithRetry(program, payer, id)
 }
 
 export async function claimMining(program: Program, holder: PublicKey, monster: Keyed<Monster>) {

@@ -43,13 +43,24 @@ explicitly checked and found sound:
 (`program_data.upgrade_authority_address == admin`), closing the deploy-time
 window where an attacker could otherwise call it first and seize admin.
 
+## Randomness
+
+Hatching uses **commit–reveal**: `commit_*` takes payment and pins
+`target_slot = commit_slot + 2`; `reveal_monster` seeds the roll from
+`keccak(slot_hash(target_slot), minter, monster_id)`. The target slot's hash
+does not exist at payment time, so the outcome can't be predicted or ground
+out by aborting an atomic transaction, and a paid commit can't be re-rolled
+(abandoning it forfeits payment). The rarity/stat derivation is a pure,
+unit-tested function of the seed.
+
 ## Known limitations before mainnet
 
-- **Randomness** — mint rolls in `rng.rs` derive from clock/slot/minter and
-  are deterministically computable, so a wrapper program can grind for rare
-  rolls by aborting unfavorable atomic transactions. Replace with a VRF
-  (e.g. Switchboard On-Demand) before mainnet. This is the single most
-  important pre-mainnet change.
+- **Slot-hash randomness vs VRF** — a block leader can in principle bias the
+  slot hash the reveal reads. For a high-value launch, swap the reveal seed
+  for a VRF (e.g. Switchboard On-Demand); it's a localized change at the seed
+  fed to `traits::roll_traits`.
+- **On-chain integration testing** — the commit–reveal flow must be validated
+  with `anchor test` on a validator (not runnable in the cloud build env).
 - **No external audit** — this code has not been independently audited.
 - **Metadata hosting** — artwork/metadata is placeholder content served from
   GitHub; move to permanent storage (Arweave/IPFS) for mainnet.

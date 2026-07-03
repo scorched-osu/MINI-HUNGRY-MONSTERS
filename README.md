@@ -31,6 +31,11 @@ holds the token owns the monster and its mining pot. Each monster rolls:
 *Placeholder values — mining speeds, odds and prices live in an on-chain
 config the admin can tune at any time without redeploying.
 
+Hatching is a two-step **commit → reveal**: you pay and commit, then reveal a
+moment later once a future block seals the roll. This makes rarity
+unpredictable at payment time and impossible to grind. See
+[docs/GAME_DESIGN.md](docs/GAME_DESIGN.md).
+
 ### ⛏️ Idle mining
 Every monster accrues MHM continuously based on its rolled mining speed.
 `claim_mining` mints everything accrued to the current NFT holder. Unclaimed

@@ -5,6 +5,13 @@ pub const MHM_MINT_SEED: &[u8] = b"mhm-mint";
 pub const MONSTER_SEED: &[u8] = b"monster";
 pub const BATTLE_SEED: &[u8] = b"battle";
 pub const LISTING_SEED: &[u8] = b"listing";
+pub const PENDING_SEED: &[u8] = b"pending";
+
+/// A hatch commits to a slot this many slots in the future; the roll is then
+/// seeded from that slot's hash (unknowable at commit time). Small so the
+/// reveal can happen almost immediately, but non-zero so the entropy slot
+/// does not yet exist when payment is taken.
+pub const REVEAL_DELAY_SLOTS: u64 = 2;
 
 /// MHM coin uses 6 decimals; 1 MHM = 1_000_000 micro-MHM.
 pub const MHM_DECIMALS: u8 = 6;
@@ -133,6 +140,25 @@ pub struct Monster {
     pub in_battle: bool,
     /// The battle this monster is locked into (default Pubkey when not in battle).
     pub battle: Pubkey,
+    pub bump: u8,
+}
+
+/// A hatch that has been paid for and is awaiting its randomness reveal.
+///
+/// Commit–reveal defeats mint-roll grinding: payment is taken now, but the
+/// monster's traits are seeded from the hash of `target_slot` — a slot that
+/// does not yet exist at commit time, so the outcome cannot be predicted (or
+/// aborted-and-retried within one atomic transaction). Once `target_slot` is
+/// produced its hash is fixed, so the minter cannot re-roll a paid commit;
+/// abandoning it just forfeits the payment.
+#[account]
+#[derive(InitSpace)]
+pub struct PendingMint {
+    pub minter: Pubkey,
+    pub monster_mint: Pubkey,
+    pub monster_id: u64,
+    /// Slot whose hash seeds the roll (commit_slot + REVEAL_DELAY_SLOTS).
+    pub target_slot: u64,
     pub bump: u8,
 }
 

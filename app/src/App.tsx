@@ -169,6 +169,13 @@ export default function App() {
 
       {tab === 'hatchery' && config && (
         <section className="hatchery">
+          <div className="card odds" style={{ gridColumn: '1 / -1' }}>
+            <p className="muted">
+              🎲 Hatching is a two-step commit → reveal: your monster's rarity is
+              sealed to a future block and revealed a moment later, so it can't be
+              predicted or grinded. Approve both transactions; the wait is brief.
+            </p>
+          </div>
           <div className="card">
             <h2>🥚 Genesis Hatch — pay SOL</h2>
             <p>
