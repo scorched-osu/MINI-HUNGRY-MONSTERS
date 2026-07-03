@@ -47,12 +47,16 @@ Two steps, defeating rarity grinding:
    stats, mints the NFT to the minter, attaches metadata, revokes the mint
    authority, and closes the pending record (rent back to the minter).
 
-Because `target_slot`'s hash doesn't exist at commit time, the outcome is
+Because the seed slot's hash doesn't exist at commit time, the outcome is
 unpredictable when you pay; because it's fixed once produced, a paid commit
-can't be re-rolled (abandoning it just forfeits payment). Reveal must happen
-within the SlotHashes window (~512 slots); miss it and the hatch expires. See
-`docs/MAINNET_CHECKLIST.md` for the note on upgrading to a VRF for the
-strongest (leader-collusion-resistant) guarantee.
+can't be re-rolled (abandoning it just forfeits payment). The reveal seeds from
+the first *produced* slot at-or-after `target_slot`, so a skipped target slot
+(a few percent of Solana slots) still reveals from the next real slot instead
+of forfeiting. Reveal must land within `REVEAL_WINDOW_SLOTS` (256, ≈1.5–2 min)
+of the target — comfortably under the SlotHashes buffer so the seed slot can't
+drift as entries age — else the hatch expires. See `docs/MAINNET_CHECKLIST.md`
+for the note on upgrading to a VRF for the strongest
+(leader-collusion-resistant) guarantee.
 
 ## Idle mining
 

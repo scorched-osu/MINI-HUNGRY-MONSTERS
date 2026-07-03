@@ -2200,9 +2200,9 @@
         "Seeds the roll from the hash of the committed `target_slot` (produced",
         "after the commit, so unpredictable at payment time), then rolls rarity",
         "and stats, mints the single NFT to the minter, attaches metadata, and",
-        "revokes the mint authority. Permissionless once the slot is available,",
-        "but only the original minter receives the NFT. If the reveal window",
-        "(~512 slots) is missed the hatch expires and the payment is forfeit."
+        "revokes the mint authority. Only the original minter may reveal (they",
+        "receive the NFT). The reveal must land within REVEAL_WINDOW_SLOTS of the",
+        "target; miss it and the hatch expires and the payment is forfeit."
       ],
       "discriminator": [
         228,

@@ -13,6 +13,13 @@ pub const PENDING_SEED: &[u8] = b"pending";
 /// does not yet exist when payment is taken.
 pub const REVEAL_DELAY_SLOTS: u64 = 2;
 
+/// The reveal must land within this many slots of `target_slot`. Kept well
+/// under the ~512-entry SlotHashes buffer so the seed slot cannot drift as
+/// old entries age out (which would otherwise let a minter grind by timing
+/// the reveal). ~256 slots ≈ 1.5–2 minutes — ample, since reveal normally
+/// follows the commit within seconds.
+pub const REVEAL_WINDOW_SLOTS: u64 = 256;
+
 /// MHM coin uses 6 decimals; 1 MHM = 1_000_000 micro-MHM.
 pub const MHM_DECIMALS: u8 = 6;
 /// How many seconds a player has to pick their actions each battle turn.

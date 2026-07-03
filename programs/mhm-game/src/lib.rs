@@ -234,9 +234,9 @@ pub mod mhm_game {
     /// Seeds the roll from the hash of the committed `target_slot` (produced
     /// after the commit, so unpredictable at payment time), then rolls rarity
     /// and stats, mints the single NFT to the minter, attaches metadata, and
-    /// revokes the mint authority. Permissionless once the slot is available,
-    /// but only the original minter receives the NFT. If the reveal window
-    /// (~512 slots) is missed the hatch expires and the payment is forfeit.
+    /// revokes the mint authority. Only the original minter may reveal (they
+    /// receive the NFT). The reveal must land within REVEAL_WINDOW_SLOTS of the
+    /// target; miss it and the hatch expires and the payment is forfeit.
     pub fn reveal_monster(ctx: Context<RevealMonster>) -> Result<()> {
         let clock = Clock::get()?;
         let pending = &ctx.accounts.pending;
@@ -245,16 +245,25 @@ pub mod mhm_game {
             MhmError::PendingMintMismatch
         );
 
-        // Fetch the committed slot's hash from the SlotHashes sysvar.
+        // Seed from the first produced slot at-or-after the target (tolerating
+        // skipped slots). The bounded window below keeps this chosen slot from
+        // drifting as the SlotHashes buffer ages, so the seed stays fixed once
+        // the slot exists — no timing-based grinding.
         let data = ctx.accounts.slot_hashes.try_borrow_data()?;
-        let slot_hash = match rng::slot_hash_for(&data, pending.target_slot) {
-            Some(h) => h,
+        let slot_hash = match rng::first_hash_at_or_after(&data, pending.target_slot) {
+            Some((_slot, h)) => {
+                // A qualifying slot exists; enforce the reveal window so it can
+                // still be in the buffer (and thus stable).
+                require!(
+                    clock.slot <= pending.target_slot + REVEAL_WINDOW_SLOTS,
+                    MhmError::RevealExpired
+                );
+                h
+            }
             None => {
-                // Not present: either the slot's hash does not exist yet, or it
-                // aged out of the buffer. A slot's hash only enters SlotHashes
-                // once the chain is strictly past it, so anything up to and
-                // including target_slot is still "too early"; only beyond it can
-                // a missing entry mean the reveal window was missed.
+                // No produced slot at-or-after the target. Either the target
+                // slot has not been produced yet (too early), or everything at
+                // or after it aged out unrevealed (expired).
                 require!(
                     clock.slot > pending.target_slot,
                     MhmError::RevealTooEarly
@@ -1096,8 +1105,11 @@ pub struct RevealMonster<'info> {
     )]
     pub monster: Account<'info, Monster>,
 
+    // init_if_needed (not init) so a griefer front-running the deterministic
+    // ATA between commit and reveal can't block the reveal; the ATA address is
+    // still pinned to (monster_mint, payer).
     #[account(
-        init,
+        init_if_needed,
         payer = payer,
         associated_token::mint = monster_mint,
         associated_token::authority = payer,

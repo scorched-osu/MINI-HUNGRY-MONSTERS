@@ -13,33 +13,41 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::keccak;
 
-/// Look up the hash of `target_slot` in the raw SlotHashes sysvar data.
+/// Find the entry for the smallest produced slot `>= target_slot` in the raw
+/// SlotHashes sysvar data, returning `(slot, hash)`.
 ///
 /// Layout: `u64` entry count, then that many `(slot: u64, hash: [u8; 32])`
-/// records ordered newest-slot-first. Returns `None` if the slot is not
-/// present (either not produced yet, or aged out of the ~512-entry buffer).
-pub fn slot_hash_for(data: &[u8], target_slot: u64) -> Option<[u8; 32]> {
+/// records ordered newest-slot-first. Using the first slot at-or-after the
+/// target (rather than an exact match) tolerates *skipped* slots — a few
+/// percent of Solana slots produce no block — so a paid commit whose exact
+/// target slot was skipped can still reveal from the next real slot. The
+/// caller bounds the reveal window so this chosen slot cannot drift as the
+/// buffer ages, keeping the seed stable (and thus un-grindable).
+///
+/// Returns `None` if no such slot is present (either the target has not been
+/// produced yet, or everything at-or-after it aged out of the buffer).
+pub fn first_hash_at_or_after(data: &[u8], target_slot: u64) -> Option<(u64, [u8; 32])> {
     if data.len() < 8 {
         return None;
     }
     let count = u64::from_le_bytes(data[0..8].try_into().ok()?) as usize;
+    let mut best: Option<(u64, [u8; 32])> = None;
     for i in 0..count {
         let base = 8 + i * 40;
         if base + 40 > data.len() {
             break;
         }
         let slot = u64::from_le_bytes(data[base..base + 8].try_into().ok()?);
-        if slot == target_slot {
-            let mut h = [0u8; 32];
-            h.copy_from_slice(&data[base + 8..base + 40]);
-            return Some(h);
-        }
-        // Entries descend by slot; once we pass the target it cannot appear.
+        // Entries descend by slot; once below the target, nothing further can
+        // qualify, and the last qualifier seen is the smallest slot >= target.
         if slot < target_slot {
             break;
         }
+        let mut h = [0u8; 32];
+        h.copy_from_slice(&data[base + 8..base + 40]);
+        best = Some((slot, h));
     }
-    None
+    best
 }
 
 /// Build the roll seed for a reveal: bind the slot hash to the specific minter
@@ -121,17 +129,22 @@ mod tests {
     }
 
     #[test]
-    fn finds_present_slot_hash_and_rejects_absent() {
-        // Newest-slot-first, as the runtime stores it.
+    fn picks_first_slot_at_or_after_target_tolerating_skips() {
+        // Newest-slot-first, as the runtime stores it. Slot 103 is skipped.
         let entries = [(105u64, [5u8; 32]), (104, [4u8; 32]), (102, [2u8; 32])];
         let data = build_slot_hashes(&entries);
-        assert_eq!(slot_hash_for(&data, 104), Some([4u8; 32]));
-        assert_eq!(slot_hash_for(&data, 105), Some([5u8; 32]));
-        // 103 was skipped (never produced / already gone); 100 aged out.
-        assert_eq!(slot_hash_for(&data, 103), None);
-        assert_eq!(slot_hash_for(&data, 100), None);
-        // A future slot is absent.
-        assert_eq!(slot_hash_for(&data, 999), None);
+        // Exact hits.
+        assert_eq!(first_hash_at_or_after(&data, 104), Some((104, [4u8; 32])));
+        assert_eq!(first_hash_at_or_after(&data, 105), Some((105, [5u8; 32])));
+        // Target 103 was skipped -> fall forward to the next produced slot, 104.
+        assert_eq!(first_hash_at_or_after(&data, 103), Some((104, [4u8; 32])));
+        // Target at/under the oldest present slot -> that oldest slot.
+        assert_eq!(first_hash_at_or_after(&data, 102), Some((102, [2u8; 32])));
+        assert_eq!(first_hash_at_or_after(&data, 100), Some((102, [2u8; 32])));
+        // A future slot beyond everything present -> none yet.
+        assert_eq!(first_hash_at_or_after(&data, 999), None);
+        // Empty buffer.
+        assert_eq!(first_hash_at_or_after(&build_slot_hashes(&[]), 5), None);
     }
 
     #[test]
