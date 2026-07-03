@@ -66,6 +66,20 @@ pub enum MhmError {
     PendingMintMismatch,
     #[msg("Invalid SlotHashes sysvar account")]
     BadSlotHashes,
+    #[msg("Match is not open for joining")]
+    MatchNotOpen,
+    #[msg("Match is not active")]
+    MatchNotActive,
+    #[msg("Match is not finished")]
+    MatchNotFinished,
+    #[msg("You are not a player in this match")]
+    NotAMatchPlayer,
+    #[msg("You cannot match against your own monster")]
+    CannotMatchSelf,
+    #[msg("Only the match creator can cancel")]
+    NotMatchCreator,
+    #[msg("Destination NFT account does not belong to the correct recipient")]
+    BadMatchRecipient,
     #[msg("Listing price must be greater than zero")]
     BadPrice,
     #[msg("Only the seller can cancel this listing")]

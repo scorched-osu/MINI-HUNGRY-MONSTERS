@@ -6,6 +6,13 @@ pub const MONSTER_SEED: &[u8] = b"monster";
 pub const BATTLE_SEED: &[u8] = b"battle";
 pub const LISTING_SEED: &[u8] = b"listing";
 pub const PENDING_SEED: &[u8] = b"pending";
+pub const MATCH_SEED: &[u8] = b"match";
+
+/// Game wins needed to take an NFT-staked Grudge Match (best of 5 → first to 3).
+pub const MATCH_WINS_NEEDED: u8 = 3;
+/// Hard cap on games in a match (best of 5 is 5, extra headroom for draws,
+/// which replay without awarding a win).
+pub const MAX_MATCH_GAMES: u8 = 9;
 
 /// A hatch commits to a slot this many slots in the future; the roll is then
 /// seeded from that slot's hash (unknowable at commit time). Small so the
@@ -325,6 +332,76 @@ impl Battle {
     }
 }
 
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Debug, InitSpace)]
+pub enum MatchState {
+    /// Created by a challenger (NFT escrowed), waiting for an opponent.
+    Open,
+    /// Both NFTs escrowed, games in progress.
+    Active,
+    /// A winner has been decided; NFTs not yet paid out.
+    Finished,
+    /// Cancelled before anyone joined; NFT returned.
+    Cancelled,
+    /// NFTs paid out. Terminal.
+    Settled,
+}
+
+/// An NFT-staked, best-of-5 Grudge Match. HIGH STAKES: both monsters' NFTs are
+/// escrowed on-chain; the winner (first to [MATCH_WINS_NEEDED] game wins) takes
+/// BOTH NFTs — the loser's monster is gone. Reuses the [Combat] engine per game.
+#[account]
+#[derive(InitSpace)]
+pub struct GrudgeMatch {
+    pub id: u64,
+    pub state: MatchState,
+    pub players: [Pubkey; 2],
+    /// The escrowed monster NFT mints.
+    pub monsters: [Pubkey; 2],
+    // Fighter inputs snapshotted per side.
+    pub rarity: [u8; 2],
+    pub level: [u16; 2],
+    pub base_hp: [u32; 2],
+    pub base_power: [u32; 2],
+    pub base_defense: [u32; 2],
+    /// Games won by each side this match.
+    pub game_wins: [u8; 2],
+    pub games_played: u8,
+    /// Current game's combat board.
+    pub board: Combat,
+    /// 0 or 1 = winning side, DRAW (2) = drawn match, NONE_U8 = undecided.
+    pub winner: u8,
+    pub bump: u8,
+}
+
+impl GrudgeMatch {
+    pub fn side_of(&self, player: &Pubkey) -> Option<usize> {
+        self.players.iter().position(|p| p == player)
+    }
+}
+
+/// Award a game win to `side` and report whether the match is now decided
+/// (returns the winning side once it reaches [MATCH_WINS_NEEDED]).
+pub fn record_game_win(game_wins: &mut [u8; 2], side: usize) -> Option<u8> {
+    game_wins[side] = game_wins[side].saturating_add(1);
+    if game_wins[side] >= MATCH_WINS_NEEDED {
+        Some(side as u8)
+    } else {
+        None
+    }
+}
+
+/// Decide a match forced to stop at the game cap: higher game-win count wins,
+/// a tie is a draw (DRAW).
+pub fn decide_on_cap(game_wins: &[u8; 2]) -> u8 {
+    if game_wins[0] > game_wins[1] {
+        0
+    } else if game_wins[1] > game_wins[0] {
+        1
+    } else {
+        DRAW
+    }
+}
+
 /// A marketplace listing: the monster NFT sits in a program escrow until the
 /// listing is bought (price paid in MHM) or cancelled. PDA seeded by the
 /// monster mint, so a monster can have at most one live listing.
@@ -340,4 +417,35 @@ pub struct Listing {
     pub price: u64,
     pub created_ts: i64,
     pub bump: u8,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn best_of_five_needs_three_game_wins() {
+        let mut w = [0u8, 0];
+        assert_eq!(record_game_win(&mut w, 0), None); // 1-0
+        assert_eq!(record_game_win(&mut w, 1), None); // 1-1
+        assert_eq!(record_game_win(&mut w, 0), None); // 2-1
+        assert_eq!(record_game_win(&mut w, 1), None); // 2-2
+        assert_eq!(record_game_win(&mut w, 0), Some(0)); // 3-2 -> side 0 wins
+        assert_eq!(w, [3, 2]);
+    }
+
+    #[test]
+    fn sweep_wins_at_three_zero() {
+        let mut w = [0u8, 0];
+        record_game_win(&mut w, 1);
+        record_game_win(&mut w, 1);
+        assert_eq!(record_game_win(&mut w, 1), Some(1));
+    }
+
+    #[test]
+    fn cap_decides_by_game_wins_or_draw() {
+        assert_eq!(decide_on_cap(&[2, 1]), 0);
+        assert_eq!(decide_on_cap(&[1, 2]), 1);
+        assert_eq!(decide_on_cap(&[2, 2]), DRAW);
+    }
 }

@@ -104,6 +104,22 @@ export interface Listing {
   createdTs: BN
 }
 
+export interface GrudgeMatch {
+  id: BN
+  state: Record<string, unknown>
+  players: PublicKey[]
+  monsters: PublicKey[]
+  rarity: number[]
+  level: number[]
+  baseHp: number[]
+  basePower: number[]
+  baseDefense: number[]
+  gameWins: number[]
+  gamesPlayed: number
+  board: Combat
+  winner: number
+}
+
 export interface Keyed<T> {
   publicKey: PublicKey
   account: T
@@ -123,6 +139,8 @@ export const monsterPda = (mint: PublicKey) =>
   PublicKey.findProgramAddressSync([Buffer.from('monster'), mint.toBuffer()], PROGRAM_ID)[0]
 export const battlePda = (id: BN | number) =>
   PublicKey.findProgramAddressSync([Buffer.from('battle'), le8(id)], PROGRAM_ID)[0]
+export const matchPda = (id: BN | number) =>
+  PublicKey.findProgramAddressSync([Buffer.from('match'), le8(id)], PROGRAM_ID)[0]
 export const listingPda = (mint: PublicKey) =>
   PublicKey.findProgramAddressSync([Buffer.from('listing'), mint.toBuffer()], PROGRAM_ID)[0]
 export const pendingPda = (id: BN | number) =>
@@ -166,6 +184,10 @@ export async function fetchAllBattles(program: Program): Promise<Keyed<Battle>[]
 
 export async function fetchAllListings(program: Program): Promise<Keyed<Listing>[]> {
   return (await accounts(program).listing.all()) as Keyed<Listing>[]
+}
+
+export async function fetchAllMatches(program: Program): Promise<Keyed<GrudgeMatch>[]> {
+  return (await accounts(program).grudgeMatch.all()) as Keyed<GrudgeMatch>[]
 }
 
 /** Mints (as base58 strings) of NFTs the wallet holds with amount == 1. */
@@ -528,6 +550,124 @@ export async function settleBattle(
       mhmMint,
       winnerMhmAta: winnerAta as PublicKey | null as never,
       feeMhmAta: (winnerAta ? feeAta : null) as PublicKey | null as never,
+      tokenProgram: TOKEN_PROGRAM_ID,
+    })
+    .preInstructions(pre)
+    .rpc()
+}
+
+// ---------- NFT-staked Grudge Matches ----------
+
+export async function createMatch(
+  program: Program,
+  creator: PublicKey,
+  config: GameConfig,
+  monster: Keyed<Monster>,
+) {
+  const id = config.battlesCreated
+  const gm = matchPda(id)
+  const mint = monster.account.mint
+  return program.methods
+    .createMatch(new BN(id))
+    .accounts({
+      config: configPda(),
+      grudgeMatch: gm,
+      monsterMint: mint,
+      monster: monster.publicKey,
+      creatorNftToken: getAssociatedTokenAddressSync(mint, creator),
+      escrowNftToken: getAssociatedTokenAddressSync(mint, gm, true),
+      creator,
+      systemProgram: SystemProgram.programId,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+    })
+    .rpc()
+}
+
+export async function joinMatch(
+  program: Program,
+  joiner: PublicKey,
+  gm: Keyed<GrudgeMatch>,
+  monster: Keyed<Monster>,
+) {
+  const mint = monster.account.mint
+  return program.methods
+    .joinMatch()
+    .accounts({
+      grudgeMatch: gm.publicKey,
+      monsterMint: mint,
+      monster: monster.publicKey,
+      joinerNftToken: getAssociatedTokenAddressSync(mint, joiner),
+      escrowNftToken: getAssociatedTokenAddressSync(mint, gm.publicKey, true),
+      joiner,
+      systemProgram: SystemProgram.programId,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+    })
+    .rpc()
+}
+
+export async function submitMatchAction(
+  program: Program,
+  player: PublicKey,
+  gm: PublicKey,
+  consumable: number,
+  support: number,
+) {
+  return program.methods
+    .submitMatchAction(consumable, support)
+    .accounts({ grudgeMatch: gm, player })
+    .rpc()
+}
+
+export async function claimMatchTimeout(program: Program, player: PublicKey, gm: PublicKey) {
+  return program.methods.claimMatchTimeout().accounts({ grudgeMatch: gm, player }).rpc()
+}
+
+export async function cancelMatch(program: Program, creator: PublicKey, gm: Keyed<GrudgeMatch>) {
+  const mint = gm.account.monsters[0]
+  return program.methods
+    .cancelMatch()
+    .accounts({
+      grudgeMatch: gm.publicKey,
+      monsterMint: mint,
+      escrowNftToken: getAssociatedTokenAddressSync(mint, gm.publicKey, true),
+      creatorNftToken: getAssociatedTokenAddressSync(mint, creator),
+      creator,
+      systemProgram: SystemProgram.programId,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+    })
+    .rpc()
+}
+
+export async function settleMatch(program: Program, payer: PublicKey, gm: Keyed<GrudgeMatch>) {
+  const a = gm.account.monsters[0]
+  const b = gm.account.monsters[1]
+  const isDraw = gm.account.winner === 2
+  const recA = isDraw ? gm.account.players[0] : gm.account.players[gm.account.winner]
+  const recB = isDraw ? gm.account.players[1] : gm.account.players[gm.account.winner]
+  const destA = getAssociatedTokenAddressSync(a, recA)
+  const destB = getAssociatedTokenAddressSync(b, recB)
+  const pre: TransactionInstruction[] = [
+    createAssociatedTokenAccountIdempotentInstruction(payer, destA, recA, a),
+    createAssociatedTokenAccountIdempotentInstruction(payer, destB, recB, b),
+  ]
+  return program.methods
+    .settleMatch()
+    .accounts({
+      grudgeMatch: gm.publicKey,
+      monsterMintA: a,
+      monsterMintB: b,
+      escrowA: getAssociatedTokenAddressSync(a, gm.publicKey, true),
+      escrowB: getAssociatedTokenAddressSync(b, gm.publicKey, true),
+      destA,
+      destB,
+      monsterA: monsterPda(a),
+      monsterB: monsterPda(b),
+      player0: gm.account.players[0],
+      player1: gm.account.players[1],
+      payer,
       tokenProgram: TOKEN_PROGRAM_ID,
     })
     .preInstructions(pre)

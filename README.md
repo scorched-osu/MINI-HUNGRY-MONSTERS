@@ -62,6 +62,13 @@ with an attack does nothing.
 - **When you win, you receive the loser's entire mining pot** (minus a small
   configurable rake to the fee wallet), minted straight to your wallet.
 
+### 🩸 Grudge Matches — NFT on the line
+The highest-stakes mode: both players **escrow their monster NFT** and play a
+**best of 5**. Win and you take your opponent's monster; lose and yours is gone
+for good. Higher rarities hit harder, strike faster, and LEGENDARY+ get special
+traits that bite lower-rarity foes — but **level up** your monster (MHM cost
+scales with rarity) and a lower tier can still upset a higher one.
+
 ### 🛒 Marketplace
 List your monsters for sale priced in MHM: the NFT sits in an on-chain escrow
 until bought (2% fee to the fee wallet, rest to you) or delisted. The

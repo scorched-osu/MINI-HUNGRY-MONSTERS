@@ -680,6 +680,289 @@ pub mod mhm_game {
         Ok(())
     }
 
+    // ---- NFT-staked Grudge Matches (best of 5, winner takes both NFTs) ----
+
+    /// Open a Grudge Match: escrow your monster's NFT and stake it on a
+    /// best-of-5. HIGHEST RISK — lose and your monster is gone for good.
+    pub fn create_match(ctx: Context<CreateMatch>, match_id: u64) -> Result<()> {
+        let config = &mut ctx.accounts.config;
+        require!(!config.paused, MhmError::GamePaused);
+        require!(match_id == config.battles_created, MhmError::Overflow);
+        config.battles_created += 1;
+
+        // Escrow the challenger's NFT.
+        token::transfer(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                Transfer {
+                    from: ctx.accounts.creator_nft_token.to_account_info(),
+                    to: ctx.accounts.escrow_nft_token.to_account_info(),
+                    authority: ctx.accounts.creator.to_account_info(),
+                },
+            ),
+            1,
+        )?;
+
+        let m = &mut ctx.accounts.grudge_match;
+        let monster = &ctx.accounts.monster;
+        m.id = match_id;
+        m.state = MatchState::Open;
+        m.players[0] = ctx.accounts.creator.key();
+        m.monsters[0] = monster.mint;
+        m.rarity[0] = monster.rarity.index() as u8;
+        m.level[0] = monster.level;
+        m.base_hp[0] = monster.max_hp;
+        m.base_power[0] = monster.power;
+        m.base_defense[0] = monster.defense;
+        m.game_wins = [0, 0];
+        m.games_played = 0;
+        m.winner = NONE_U8;
+        m.bump = ctx.bumps.grudge_match;
+
+        emit!(MatchCreated {
+            grudge_match: m.key(),
+            creator: m.players[0],
+            monster: monster.mint,
+        });
+        Ok(())
+    }
+
+    /// Accept a Grudge Match: escrow your NFT and start game 1.
+    pub fn join_match(ctx: Context<JoinMatch>) -> Result<()> {
+        let now = Clock::get()?.unix_timestamp;
+        let m = &mut ctx.accounts.grudge_match;
+        require!(m.state == MatchState::Open, MhmError::MatchNotOpen);
+        let monster = &ctx.accounts.monster;
+        require!(monster.mint != m.monsters[0], MhmError::CannotMatchSelf);
+        require!(
+            ctx.accounts.joiner.key() != m.players[0],
+            MhmError::CannotMatchSelf
+        );
+
+        token::transfer(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                Transfer {
+                    from: ctx.accounts.joiner_nft_token.to_account_info(),
+                    to: ctx.accounts.escrow_nft_token.to_account_info(),
+                    authority: ctx.accounts.joiner.to_account_info(),
+                },
+            ),
+            1,
+        )?;
+
+        m.players[1] = ctx.accounts.joiner.key();
+        m.monsters[1] = monster.mint;
+        m.rarity[1] = monster.rarity.index() as u8;
+        m.level[1] = monster.level;
+        m.base_hp[1] = monster.max_hp;
+        m.base_power[1] = monster.power;
+        m.base_defense[1] = monster.defense;
+
+        let f0 = combat_stats::fighter(
+            m.base_hp[0], m.base_power[0], m.base_defense[0],
+            m.rarity[0] as usize, m.level[0], m.rarity[1] as usize,
+        );
+        let f1 = combat_stats::fighter(
+            m.base_hp[1], m.base_power[1], m.base_defense[1],
+            m.rarity[1] as usize, m.level[1], m.rarity[0] as usize,
+        );
+        m.board = Combat::new(&f0, &f1, now + TURN_DEADLINE_SECS);
+        m.state = MatchState::Active;
+
+        emit!(MatchJoined {
+            grudge_match: m.key(),
+            joiner: m.players[1],
+            monster: monster.mint,
+        });
+        Ok(())
+    }
+
+    /// Submit this game's turn actions in a match (same rules as a battle turn).
+    /// When a game ends the match tallies it toward the best-of-5.
+    pub fn submit_match_action(
+        ctx: Context<SubmitMatchAction>,
+        consumable: u8,
+        support: u8,
+    ) -> Result<()> {
+        let now = Clock::get()?.unix_timestamp;
+        let m = &mut ctx.accounts.grudge_match;
+        require!(m.state == MatchState::Active, MhmError::MatchNotActive);
+        require!(now <= m.board.deadline, MhmError::TurnDeadlinePassed);
+
+        let side = m
+            .side_of(&ctx.accounts.player.key())
+            .ok_or(MhmError::NotAMatchPlayer)?;
+        require!(!m.board.pending[side].submitted, MhmError::AlreadySubmitted);
+
+        let consumable_def = get_action(consumable).ok_or(MhmError::UnknownAction)?;
+        require!(consumable_def.slot == ActionSlot::Consumable, MhmError::NotAConsumable);
+        if support != NONE_U8 {
+            let support_def = get_action(support).ok_or(MhmError::UnknownAction)?;
+            require!(support_def.slot == ActionSlot::Support, MhmError::NotASupport);
+        }
+
+        m.board.pending[side] = PendingAction { submitted: true, consumable, support };
+
+        if m.board.pending[0].submitted && m.board.pending[1].submitted {
+            let outcome = combat::resolve_turn(&mut m.board, now);
+            match outcome {
+                state::TurnOutcome::Continue => {}
+                state::TurnOutcome::Win(w) => conclude_game(m, Some(w), now),
+                state::TurnOutcome::Draw => conclude_game(m, None, now),
+            }
+            emit!(MatchProgress {
+                grudge_match: m.key(),
+                game_wins: m.game_wins,
+                games_played: m.games_played,
+            });
+            if m.state == MatchState::Finished {
+                emit!(MatchFinished { grudge_match: m.key(), winner: m.winner });
+            }
+        }
+        Ok(())
+    }
+
+    /// After the 90s clock lapses, award the current game to whoever submitted
+    /// (both silent = a drawn game, replayed). May end the match.
+    pub fn claim_match_timeout(ctx: Context<ClaimMatchTimeout>) -> Result<()> {
+        let now = Clock::get()?.unix_timestamp;
+        let m = &mut ctx.accounts.grudge_match;
+        require!(m.state == MatchState::Active, MhmError::MatchNotActive);
+        require!(now > m.board.deadline, MhmError::DeadlineNotReached);
+        m.side_of(&ctx.accounts.player.key())
+            .ok_or(MhmError::NotAMatchPlayer)?;
+
+        let a = m.board.pending[0].submitted;
+        let b = m.board.pending[1].submitted;
+        let game_winner = match (a, b) {
+            (true, false) => Some(0u8),
+            (false, true) => Some(1u8),
+            (false, false) => None,
+            // Both submitted would have auto-resolved on the 2nd submission.
+            (true, true) => return err!(MhmError::CallerDidNotSubmit),
+        };
+        conclude_game(m, game_winner, now);
+        emit!(MatchProgress {
+            grudge_match: m.key(),
+            game_wins: m.game_wins,
+            games_played: m.games_played,
+        });
+        if m.state == MatchState::Finished {
+            emit!(MatchFinished { grudge_match: m.key(), winner: m.winner });
+        }
+        Ok(())
+    }
+
+    /// Cancel an unaccepted Grudge Match; the escrowed NFT returns to you.
+    pub fn cancel_match(ctx: Context<CancelMatch>) -> Result<()> {
+        let m = &ctx.accounts.grudge_match;
+        require!(m.state == MatchState::Open, MhmError::MatchNotOpen);
+        require!(m.players[0] == ctx.accounts.creator.key(), MhmError::NotMatchCreator);
+
+        let id = m.id;
+        let bump = m.bump;
+        let signer_seeds: &[&[&[u8]]] = &[&[MATCH_SEED, &id.to_le_bytes(), &[bump]]];
+        token::transfer(
+            CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                Transfer {
+                    from: ctx.accounts.escrow_nft_token.to_account_info(),
+                    to: ctx.accounts.creator_nft_token.to_account_info(),
+                    authority: ctx.accounts.grudge_match.to_account_info(),
+                },
+                signer_seeds,
+            ),
+            1,
+        )?;
+        token::close_account(CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            CloseAccount {
+                account: ctx.accounts.escrow_nft_token.to_account_info(),
+                destination: ctx.accounts.creator.to_account_info(),
+                authority: ctx.accounts.grudge_match.to_account_info(),
+            },
+            signer_seeds,
+        ))?;
+
+        ctx.accounts.grudge_match.state = MatchState::Cancelled;
+        Ok(())
+    }
+
+    /// Pay out a finished Grudge Match: WINNER TAKES BOTH NFTs. On a drawn
+    /// match each monster returns to its original owner. Permissionless crank.
+    pub fn settle_match(ctx: Context<SettleMatch>) -> Result<()> {
+        let m = &ctx.accounts.grudge_match;
+        require!(m.state == MatchState::Finished, MhmError::MatchNotFinished);
+
+        // Decide who receives each NFT.
+        let (rec_a, rec_b) = match m.winner {
+            0 | 1 => {
+                let w = m.players[m.winner as usize];
+                (w, w)
+            }
+            _ => (m.players[0], m.players[1]), // draw: return to owners
+        };
+        require!(
+            ctx.accounts.dest_a.owner == rec_a && ctx.accounts.dest_a.mint == m.monsters[0],
+            MhmError::BadMatchRecipient
+        );
+        require!(
+            ctx.accounts.dest_b.owner == rec_b && ctx.accounts.dest_b.mint == m.monsters[1],
+            MhmError::BadMatchRecipient
+        );
+
+        let id = m.id;
+        let bump = m.bump;
+        let signer_seeds: &[&[&[u8]]] = &[&[MATCH_SEED, &id.to_le_bytes(), &[bump]]];
+
+        for (escrow, dest, rent_to) in [
+            (&ctx.accounts.escrow_a, &ctx.accounts.dest_a, &ctx.accounts.player0),
+            (&ctx.accounts.escrow_b, &ctx.accounts.dest_b, &ctx.accounts.player1),
+        ] {
+            token::transfer(
+                CpiContext::new_with_signer(
+                    ctx.accounts.token_program.to_account_info(),
+                    Transfer {
+                        from: escrow.to_account_info(),
+                        to: dest.to_account_info(),
+                        authority: ctx.accounts.grudge_match.to_account_info(),
+                    },
+                    signer_seeds,
+                ),
+                1,
+            )?;
+            token::close_account(CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                CloseAccount {
+                    account: escrow.to_account_info(),
+                    destination: rent_to.to_account_info(),
+                    authority: ctx.accounts.grudge_match.to_account_info(),
+                },
+                signer_seeds,
+            ))?;
+        }
+
+        // Persist win/loss records on the monsters.
+        if m.winner == 0 || m.winner == 1 {
+            let winner_side = m.winner as usize;
+            if winner_side == 0 {
+                ctx.accounts.monster_a.wins += 1;
+                ctx.accounts.monster_b.losses += 1;
+            } else {
+                ctx.accounts.monster_b.wins += 1;
+                ctx.accounts.monster_a.losses += 1;
+            }
+        }
+
+        ctx.accounts.grudge_match.state = MatchState::Settled;
+        emit!(MatchSettled {
+            grudge_match: ctx.accounts.grudge_match.key(),
+            winner: ctx.accounts.grudge_match.winner,
+        });
+        Ok(())
+    }
+
     /// List a monster for sale at an MHM price. The NFT moves into a program
     /// escrow until the listing is bought or cancelled. The monster keeps
     /// mining while listed — its unclaimed pot travels to the buyer.
@@ -950,6 +1233,26 @@ fn finalize_monster<'info>(
         defense: rolled.defense,
     });
     Ok(())
+}
+
+/// Conclude one game of a match: tally the win (draws replay), then either
+/// finish the match (someone reached [MATCH_WINS_NEEDED], or the game cap is
+/// hit) or reset the board for the next game.
+fn conclude_game(m: &mut GrudgeMatch, game_winner_side: Option<u8>, now: i64) {
+    m.games_played = m.games_played.saturating_add(1);
+    if let Some(side) = game_winner_side {
+        if let Some(w) = record_game_win(&mut m.game_wins, side as usize) {
+            m.state = MatchState::Finished;
+            m.winner = w;
+            return;
+        }
+    }
+    if m.games_played >= MAX_MATCH_GAMES {
+        m.state = MatchState::Finished;
+        m.winner = decide_on_cap(&m.game_wins);
+        return;
+    }
+    m.board.reset_for_next_game(now + TURN_DEADLINE_SECS);
 }
 
 // ---------------------------------------------------------------------------
@@ -1450,6 +1753,189 @@ pub struct AdminMintMhm<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(match_id: u64)]
+pub struct CreateMatch<'info> {
+    #[account(mut, seeds = [CONFIG_SEED], bump = config.bump)]
+    pub config: Account<'info, GameConfig>,
+
+    #[account(
+        init,
+        payer = creator,
+        space = 8 + GrudgeMatch::INIT_SPACE,
+        seeds = [MATCH_SEED, match_id.to_le_bytes().as_ref()],
+        bump
+    )]
+    pub grudge_match: Account<'info, GrudgeMatch>,
+
+    pub monster_mint: Account<'info, Mint>,
+
+    #[account(
+        seeds = [MONSTER_SEED, monster_mint.key().as_ref()],
+        bump = monster.bump
+    )]
+    pub monster: Account<'info, Monster>,
+
+    #[account(
+        mut,
+        constraint = creator_nft_token.mint == monster_mint.key() @ MhmError::NotMonsterHolder,
+        constraint = creator_nft_token.owner == creator.key() @ MhmError::NotMonsterHolder,
+        constraint = creator_nft_token.amount == 1 @ MhmError::NotMonsterHolder,
+    )]
+    pub creator_nft_token: Account<'info, TokenAccount>,
+
+    #[account(
+        init,
+        payer = creator,
+        associated_token::mint = monster_mint,
+        associated_token::authority = grudge_match,
+    )]
+    pub escrow_nft_token: Account<'info, TokenAccount>,
+
+    #[account(mut)]
+    pub creator: Signer<'info>,
+    pub system_program: Program<'info, System>,
+    pub token_program: Program<'info, Token>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+}
+
+#[derive(Accounts)]
+pub struct JoinMatch<'info> {
+    #[account(mut)]
+    pub grudge_match: Account<'info, GrudgeMatch>,
+
+    pub monster_mint: Account<'info, Mint>,
+
+    #[account(
+        seeds = [MONSTER_SEED, monster_mint.key().as_ref()],
+        bump = monster.bump
+    )]
+    pub monster: Account<'info, Monster>,
+
+    #[account(
+        mut,
+        constraint = joiner_nft_token.mint == monster_mint.key() @ MhmError::NotMonsterHolder,
+        constraint = joiner_nft_token.owner == joiner.key() @ MhmError::NotMonsterHolder,
+        constraint = joiner_nft_token.amount == 1 @ MhmError::NotMonsterHolder,
+    )]
+    pub joiner_nft_token: Account<'info, TokenAccount>,
+
+    #[account(
+        init,
+        payer = joiner,
+        associated_token::mint = monster_mint,
+        associated_token::authority = grudge_match,
+    )]
+    pub escrow_nft_token: Account<'info, TokenAccount>,
+
+    #[account(mut)]
+    pub joiner: Signer<'info>,
+    pub system_program: Program<'info, System>,
+    pub token_program: Program<'info, Token>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+}
+
+#[derive(Accounts)]
+pub struct SubmitMatchAction<'info> {
+    #[account(mut)]
+    pub grudge_match: Account<'info, GrudgeMatch>,
+    pub player: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct ClaimMatchTimeout<'info> {
+    #[account(mut)]
+    pub grudge_match: Account<'info, GrudgeMatch>,
+    pub player: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct CancelMatch<'info> {
+    #[account(mut, close = creator)]
+    pub grudge_match: Account<'info, GrudgeMatch>,
+
+    #[account(address = grudge_match.monsters[0])]
+    pub monster_mint: Account<'info, Mint>,
+
+    #[account(
+        mut,
+        associated_token::mint = monster_mint,
+        associated_token::authority = grudge_match,
+    )]
+    pub escrow_nft_token: Account<'info, TokenAccount>,
+
+    #[account(
+        init_if_needed,
+        payer = creator,
+        associated_token::mint = monster_mint,
+        associated_token::authority = creator,
+    )]
+    pub creator_nft_token: Account<'info, TokenAccount>,
+
+    #[account(mut)]
+    pub creator: Signer<'info>,
+    pub system_program: Program<'info, System>,
+    pub token_program: Program<'info, Token>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+}
+
+#[derive(Accounts)]
+pub struct SettleMatch<'info> {
+    #[account(mut, close = payer)]
+    pub grudge_match: Account<'info, GrudgeMatch>,
+
+    #[account(address = grudge_match.monsters[0])]
+    pub monster_mint_a: Account<'info, Mint>,
+    #[account(address = grudge_match.monsters[1])]
+    pub monster_mint_b: Account<'info, Mint>,
+
+    #[account(
+        mut,
+        associated_token::mint = monster_mint_a,
+        associated_token::authority = grudge_match,
+    )]
+    pub escrow_a: Account<'info, TokenAccount>,
+    #[account(
+        mut,
+        associated_token::mint = monster_mint_b,
+        associated_token::authority = grudge_match,
+    )]
+    pub escrow_b: Account<'info, TokenAccount>,
+
+    /// Destination NFT accounts; validated in the handler against the winner
+    /// (or, on a draw, each monster's original owner).
+    #[account(mut)]
+    pub dest_a: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub dest_b: Account<'info, TokenAccount>,
+
+    #[account(
+        mut,
+        seeds = [MONSTER_SEED, monster_mint_a.key().as_ref()],
+        bump = monster_a.bump,
+        constraint = monster_a.mint == grudge_match.monsters[0] @ MhmError::MonsterNotInBattle
+    )]
+    pub monster_a: Account<'info, Monster>,
+    #[account(
+        mut,
+        seeds = [MONSTER_SEED, monster_mint_b.key().as_ref()],
+        bump = monster_b.bump,
+        constraint = monster_b.mint == grudge_match.monsters[1] @ MhmError::MonsterNotInBattle
+    )]
+    pub monster_b: Account<'info, Monster>,
+
+    /// CHECK: escrow-A rent returns here; enforced to be side 0's player.
+    #[account(mut, address = grudge_match.players[0])]
+    pub player0: UncheckedAccount<'info>,
+    /// CHECK: escrow-B rent returns here; enforced to be side 1's player.
+    #[account(mut, address = grudge_match.players[1])]
+    pub player1: UncheckedAccount<'info>,
+
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub token_program: Program<'info, Token>,
+}
+
+#[derive(Accounts)]
 pub struct ListMonster<'info> {
     #[account(seeds = [CONFIG_SEED], bump = config.bump)]
     pub config: Account<'info, GameConfig>,
@@ -1704,4 +2190,37 @@ pub struct BattleSettled {
     pub battle: Pubkey,
     pub winner: Pubkey,
     pub loot: u64,
+}
+
+#[event]
+pub struct MatchCreated {
+    pub grudge_match: Pubkey,
+    pub creator: Pubkey,
+    pub monster: Pubkey,
+}
+
+#[event]
+pub struct MatchJoined {
+    pub grudge_match: Pubkey,
+    pub joiner: Pubkey,
+    pub monster: Pubkey,
+}
+
+#[event]
+pub struct MatchProgress {
+    pub grudge_match: Pubkey,
+    pub game_wins: [u8; 2],
+    pub games_played: u8,
+}
+
+#[event]
+pub struct MatchFinished {
+    pub grudge_match: Pubkey,
+    pub winner: u8,
+}
+
+#[event]
+pub struct MatchSettled {
+    pub grudge_match: Pubkey,
+    pub winner: u8,
 }

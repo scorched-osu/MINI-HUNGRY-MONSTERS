@@ -12,6 +12,7 @@ import {
   MAX_LEVEL,
   fetchAllBattles,
   fetchAllListings,
+  fetchAllMatches,
   fetchAllMonsters,
   fetchConfig,
   fetchHeldMints,
@@ -22,6 +23,7 @@ import {
   mhmMintPda,
   type Battle,
   type GameConfig,
+  type GrudgeMatch,
   type Keyed,
   type Listing,
   type Monster,
@@ -29,9 +31,10 @@ import {
 import { MonsterCard } from './MonsterCard'
 import { Arena } from './Arena'
 import { Market } from './Market'
+import { Grudge } from './Grudge'
 import { RARITY_NAMES, rarityName } from './catalog'
 
-type Tab = 'monsters' | 'hatchery' | 'arena' | 'market'
+type Tab = 'monsters' | 'hatchery' | 'arena' | 'market' | 'grudge'
 
 export default function App() {
   const { connection } = useConnection()
@@ -49,6 +52,7 @@ export default function App() {
   const [held, setHeld] = useState<Set<string>>(new Set())
   const [battles, setBattles] = useState<Keyed<Battle>[]>([])
   const [listings, setListings] = useState<Keyed<Listing>[]>([])
+  const [matches, setMatches] = useState<Keyed<GrudgeMatch>[]>([])
   const [mhmBalance, setMhmBalance] = useState<BN>(new BN(0))
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState<string>('')
@@ -56,18 +60,20 @@ export default function App() {
   const refresh = useCallback(async () => {
     if (!program || !wallet.publicKey) return
     try {
-      const [cfg, all, mine, fights, sales] = await Promise.all([
+      const [cfg, all, mine, fights, sales, grudges] = await Promise.all([
         fetchConfig(program),
         fetchAllMonsters(program),
         fetchHeldMints(connection, wallet.publicKey),
         fetchAllBattles(program),
         fetchAllListings(program),
+        fetchAllMatches(program),
       ])
       setConfig(cfg)
       setMonsters(all)
       setHeld(mine)
       setBattles(fights)
       setListings(sales)
+      setMatches(grudges)
       try {
         const ata = getAssociatedTokenAddressSync(mhmMintPda(), wallet.publicKey)
         const acc = await getAccount(connection, ata)
@@ -144,6 +150,9 @@ export default function App() {
         </button>
         <button className={tab === 'market' ? 'on' : ''} onClick={() => setTab('market')}>
           Market ({listings.length})
+        </button>
+        <button className={tab === 'grudge' ? 'on' : ''} onClick={() => setTab('grudge')}>
+          🩸 Grudge ({matches.filter((m) => 'open' in m.account.state).length})
         </button>
       </nav>
 
@@ -249,6 +258,18 @@ export default function App() {
           config={config}
           listings={listings}
           monsters={monsters}
+          myMonsters={myMonsters}
+          busy={busy}
+          run={run}
+        />
+      )}
+
+      {tab === 'grudge' && config && program && wallet.publicKey && (
+        <Grudge
+          program={program}
+          me={wallet.publicKey}
+          config={config}
+          matches={matches}
           myMonsters={myMonsters}
           busy={busy}
           run={run}

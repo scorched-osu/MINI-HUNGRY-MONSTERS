@@ -147,6 +147,9 @@ select, input {
 
 button.level { background: #2a2f52; color: var(--gold); width: 100%; }
 
+.battleroom.grudge { border-color: var(--rar4); box-shadow: 0 0 20px #ff6bd633; }
+.grudge-warn { border-color: var(--danger); }
+
 @media (max-width: 700px) {
   .fighters { grid-template-columns: 1fr; }
 }

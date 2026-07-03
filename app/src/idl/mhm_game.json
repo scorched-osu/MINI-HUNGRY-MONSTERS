@@ -1050,6 +1050,257 @@
       "args": []
     },
     {
+      "name": "cancel_match",
+      "docs": [
+        "Cancel an unaccepted Grudge Match; the escrowed NFT returns to you."
+      ],
+      "discriminator": [
+        142,
+        136,
+        247,
+        45,
+        92,
+        112,
+        180,
+        83
+      ],
+      "accounts": [
+        {
+          "name": "grudge_match",
+          "writable": true
+        },
+        {
+          "name": "monster_mint"
+        },
+        {
+          "name": "escrow_nft_token",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "grudge_match"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "monster_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "creator_nft_token",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "creator"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "monster_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "claim_match_timeout",
+      "docs": [
+        "After the 90s clock lapses, award the current game to whoever submitted",
+        "(both silent = a drawn game, replayed). May end the match."
+      ],
+      "discriminator": [
+        69,
+        96,
+        91,
+        32,
+        214,
+        133,
+        169,
+        229
+      ],
+      "accounts": [
+        {
+          "name": "grudge_match",
+          "writable": true
+        },
+        {
+          "name": "player",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "claim_mining",
       "docs": [
         "Claim everything this monster has mined so far. Mints MHM to the",
@@ -1827,6 +2078,209 @@
       ]
     },
     {
+      "name": "create_match",
+      "docs": [
+        "Open a Grudge Match: escrow your monster's NFT and stake it on a",
+        "best-of-5. HIGHEST RISK — lose and your monster is gone for good."
+      ],
+      "discriminator": [
+        107,
+        2,
+        184,
+        145,
+        70,
+        142,
+        17,
+        165
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "grudge_match",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  116,
+                  99,
+                  104
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "match_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "monster_mint"
+        },
+        {
+          "name": "monster",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  111,
+                  110,
+                  115,
+                  116,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "monster_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "creator_nft_token",
+          "writable": true
+        },
+        {
+          "name": "escrow_nft_token",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "grudge_match"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "monster_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        }
+      ],
+      "args": [
+        {
+          "name": "match_id",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "initialize",
       "docs": [
         "One-time setup: creates the global config and the MHM coin mint",
@@ -1979,6 +2433,166 @@
         {
           "name": "joiner",
           "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "join_match",
+      "docs": [
+        "Accept a Grudge Match: escrow your NFT and start game 1."
+      ],
+      "discriminator": [
+        244,
+        8,
+        47,
+        130,
+        192,
+        59,
+        179,
+        44
+      ],
+      "accounts": [
+        {
+          "name": "grudge_match",
+          "writable": true
+        },
+        {
+          "name": "monster_mint"
+        },
+        {
+          "name": "monster",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  111,
+                  110,
+                  115,
+                  116,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "monster_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "joiner_nft_token",
+          "writable": true
+        },
+        {
+          "name": "escrow_nft_token",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "grudge_match"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "monster_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "joiner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
         }
       ],
       "args": []
@@ -2908,6 +3522,293 @@
       "args": []
     },
     {
+      "name": "settle_match",
+      "docs": [
+        "Pay out a finished Grudge Match: WINNER TAKES BOTH NFTs. On a drawn",
+        "match each monster returns to its original owner. Permissionless crank."
+      ],
+      "discriminator": [
+        71,
+        124,
+        117,
+        96,
+        191,
+        217,
+        116,
+        24
+      ],
+      "accounts": [
+        {
+          "name": "grudge_match",
+          "writable": true
+        },
+        {
+          "name": "monster_mint_a"
+        },
+        {
+          "name": "monster_mint_b"
+        },
+        {
+          "name": "escrow_a",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "grudge_match"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "monster_mint_a"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "escrow_b",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "grudge_match"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "monster_mint_b"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "dest_a",
+          "docs": [
+            "Destination NFT accounts; validated in the handler against the winner",
+            "(or, on a draw, each monster's original owner)."
+          ],
+          "writable": true
+        },
+        {
+          "name": "dest_b",
+          "writable": true
+        },
+        {
+          "name": "monster_a",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  111,
+                  110,
+                  115,
+                  116,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "monster_mint_a"
+              }
+            ]
+          }
+        },
+        {
+          "name": "monster_b",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  111,
+                  110,
+                  115,
+                  116,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "monster_mint_b"
+              }
+            ]
+          }
+        },
+        {
+          "name": "player0",
+          "writable": true
+        },
+        {
+          "name": "player1",
+          "writable": true
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "submit_action",
       "docs": [
         "Submit this turn's actions: one CONSUMABLE (DPS / DEF / HP+) and",
@@ -2928,6 +3829,43 @@
       "accounts": [
         {
           "name": "battle",
+          "writable": true
+        },
+        {
+          "name": "player",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "consumable",
+          "type": "u8"
+        },
+        {
+          "name": "support",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "submit_match_action",
+      "docs": [
+        "Submit this game's turn actions in a match (same rules as a battle turn).",
+        "When a game ends the match tallies it toward the best-of-5."
+      ],
+      "discriminator": [
+        188,
+        64,
+        215,
+        99,
+        79,
+        76,
+        128,
+        114
+      ],
+      "accounts": [
+        {
+          "name": "grudge_match",
           "writable": true
         },
         {
@@ -3027,6 +3965,19 @@
         69,
         96,
         133
+      ]
+    },
+    {
+      "name": "GrudgeMatch",
+      "discriminator": [
+        225,
+        154,
+        185,
+        192,
+        141,
+        182,
+        248,
+        131
       ]
     },
     {
@@ -3133,6 +4084,71 @@
         80,
         139,
         194
+      ]
+    },
+    {
+      "name": "MatchCreated",
+      "discriminator": [
+        151,
+        176,
+        11,
+        24,
+        34,
+        225,
+        227,
+        16
+      ]
+    },
+    {
+      "name": "MatchFinished",
+      "discriminator": [
+        64,
+        23,
+        27,
+        37,
+        145,
+        154,
+        100,
+        255
+      ]
+    },
+    {
+      "name": "MatchJoined",
+      "discriminator": [
+        94,
+        7,
+        113,
+        154,
+        236,
+        126,
+        100,
+        39
+      ]
+    },
+    {
+      "name": "MatchProgress",
+      "discriminator": [
+        172,
+        178,
+        249,
+        191,
+        86,
+        56,
+        216,
+        253
+      ]
+    },
+    {
+      "name": "MatchSettled",
+      "discriminator": [
+        243,
+        201,
+        134,
+        151,
+        193,
+        131,
+        223,
+        150
       ]
     },
     {
@@ -3390,21 +4406,56 @@
     },
     {
       "code": 6032,
+      "name": "MatchNotOpen",
+      "msg": "Match is not open for joining"
+    },
+    {
+      "code": 6033,
+      "name": "MatchNotActive",
+      "msg": "Match is not active"
+    },
+    {
+      "code": 6034,
+      "name": "MatchNotFinished",
+      "msg": "Match is not finished"
+    },
+    {
+      "code": 6035,
+      "name": "NotAMatchPlayer",
+      "msg": "You are not a player in this match"
+    },
+    {
+      "code": 6036,
+      "name": "CannotMatchSelf",
+      "msg": "You cannot match against your own monster"
+    },
+    {
+      "code": 6037,
+      "name": "NotMatchCreator",
+      "msg": "Only the match creator can cancel"
+    },
+    {
+      "code": 6038,
+      "name": "BadMatchRecipient",
+      "msg": "Destination NFT account does not belong to the correct recipient"
+    },
+    {
+      "code": 6039,
       "name": "BadPrice",
       "msg": "Listing price must be greater than zero"
     },
     {
-      "code": 6033,
+      "code": 6040,
       "name": "NotSeller",
       "msg": "Only the seller can cancel this listing"
     },
     {
-      "code": 6034,
+      "code": 6041,
       "name": "Unauthorized",
       "msg": "Unauthorized: admin only"
     },
     {
-      "code": 6035,
+      "code": 6042,
       "name": "Overflow",
       "msg": "Arithmetic overflow"
     }
@@ -3940,6 +4991,135 @@
       }
     },
     {
+      "name": "GrudgeMatch",
+      "docs": [
+        "An NFT-staked, best-of-5 Grudge Match. HIGH STAKES: both monsters' NFTs are",
+        "escrowed on-chain; the winner (first to [MATCH_WINS_NEEDED] game wins) takes",
+        "BOTH NFTs — the loser's monster is gone. Reuses the [Combat] engine per game."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "state",
+            "type": {
+              "defined": {
+                "name": "MatchState"
+              }
+            }
+          },
+          {
+            "name": "players",
+            "type": {
+              "array": [
+                "pubkey",
+                2
+              ]
+            }
+          },
+          {
+            "name": "monsters",
+            "docs": [
+              "The escrowed monster NFT mints."
+            ],
+            "type": {
+              "array": [
+                "pubkey",
+                2
+              ]
+            }
+          },
+          {
+            "name": "rarity",
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          },
+          {
+            "name": "level",
+            "type": {
+              "array": [
+                "u16",
+                2
+              ]
+            }
+          },
+          {
+            "name": "base_hp",
+            "type": {
+              "array": [
+                "u32",
+                2
+              ]
+            }
+          },
+          {
+            "name": "base_power",
+            "type": {
+              "array": [
+                "u32",
+                2
+              ]
+            }
+          },
+          {
+            "name": "base_defense",
+            "type": {
+              "array": [
+                "u32",
+                2
+              ]
+            }
+          },
+          {
+            "name": "game_wins",
+            "docs": [
+              "Games won by each side this match."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          },
+          {
+            "name": "games_played",
+            "type": "u8"
+          },
+          {
+            "name": "board",
+            "docs": [
+              "Current game's combat board."
+            ],
+            "type": {
+              "defined": {
+                "name": "Combat"
+              }
+            }
+          },
+          {
+            "name": "winner",
+            "docs": [
+              "0 or 1 = winning side, DRAW (2) = drawn match, NONE_U8 = undecided."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
       "name": "InitializeParams",
       "type": {
         "kind": "struct",
@@ -4075,6 +5255,126 @@
           {
             "name": "seller",
             "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MatchCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "grudge_match",
+            "type": "pubkey"
+          },
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "monster",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MatchFinished",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "grudge_match",
+            "type": "pubkey"
+          },
+          {
+            "name": "winner",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MatchJoined",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "grudge_match",
+            "type": "pubkey"
+          },
+          {
+            "name": "joiner",
+            "type": "pubkey"
+          },
+          {
+            "name": "monster",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MatchProgress",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "grudge_match",
+            "type": "pubkey"
+          },
+          {
+            "name": "game_wins",
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          },
+          {
+            "name": "games_played",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MatchSettled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "grudge_match",
+            "type": "pubkey"
+          },
+          {
+            "name": "winner",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MatchState",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Open"
+          },
+          {
+            "name": "Active"
+          },
+          {
+            "name": "Finished"
+          },
+          {
+            "name": "Cancelled"
+          },
+          {
+            "name": "Settled"
           }
         ]
       }

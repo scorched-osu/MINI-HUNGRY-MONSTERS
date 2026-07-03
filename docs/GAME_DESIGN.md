@@ -136,6 +136,53 @@ marketplace prices them in MHM and escrows the NFT on-chain:
    buyer.
 3. `cancel_listing` — seller reclaims the NFT and the escrow rent.
 
+## Leveling
+
+Monsters level up (1 → 20) via `level_up`, paying MHM to the fee wallet. Cost
+scales with rarity and current level (`base * rarityMult[1/2/4/8/16] * level`),
+so low tiers are cheap to grow and high tiers are costly. Each level raises
+effective battle stats: +6% power, +5% max HP, +4% defense, and a little
+attack speed per level (see `combat_stats.rs`). A fully-leveled low tier can
+rival a fresh high tier on raw stats — but not on traits.
+
+## Rarity combat edges
+
+Effective stats and edges are built by `combat_stats::fighter` at the start of
+each fight (so leveling/trading between fights is reflected):
+
+- **Base damage** scales with rarity (higher base power).
+- **Attack speed** rises with rarity (and level): the faster monster lands its
+  DPS first each turn; if it KOs the opponent, the opponent doesn't retaliate.
+- **Special traits (LEGENDARY & UNIQUE)**, active only vs a *strictly lower*
+  rarity opponent:
+  - LEGENDARY "Apex" — +20% DPS damage, ignores 15% of the target's defense.
+  - UNIQUE "Apex Dominion" — +35% DPS damage, ignores 30% defense, and always
+    strikes first.
+
+  Mirror or up-tier matchups get no trait bonus, so top-tier fights stay fair.
+  Tuned "strong but beatable": a well-leveled lower tier with good play can
+  upset a low-level higher tier.
+
+## Grudge Matches (NFT stakes, best of 5)
+
+The highest-stakes mode. Both players escrow their monster NFT on-chain and
+play a **best of 5** (first to 3 game wins); the **winner takes both NFTs**,
+the loser's monster is gone.
+
+1. `create_match` — challenger escrows their NFT; match opens.
+2. `join_match` — opponent escrows their NFT; game 1 begins.
+3. `submit_match_action` — same turn rules as a battle; each finished game is
+   tallied toward the best-of-5. Drawn games replay without awarding a win
+   (capped at 9 games; a cap is decided on game-win count).
+4. `claim_match_timeout` — the 90s clock awards the current game to whoever
+   submitted (both silent = drawn game, replayed).
+5. `settle_match` — permissionless payout: winner receives both NFTs (draw
+   returns each monster to its owner); win/loss records updated.
+6. `cancel_match` — creator withdraws an unaccepted challenge; NFT returned.
+
+The quick single-battle mode (staking the mining pot) remains for lower-risk
+play — see above.
+
 ## Roadmap ideas
 
 - Metaplex metadata + art per rarity tier.
