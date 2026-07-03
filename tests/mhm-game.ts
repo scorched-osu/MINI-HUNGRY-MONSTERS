@@ -408,4 +408,129 @@ describe("mini-hungry-monsters", () => {
     const fee = (BigInt(price.toString()) * 200n) / 10000n;
     assert.equal(sellerAfter - sellerBefore, BigInt(price.toString()) - fee);
   });
+
+  it("levels up a monster, and runs an NFT-staked Grudge Match to the win", async () => {
+    // Fresh monsters for the two players.
+    const cM = await hatch(playerA);
+    const dM = await hatch(playerB);
+
+    // Level up monster C so leveling is exercised end to end.
+    await program.methods
+      .levelUp()
+      .accounts({
+        config: configPda,
+        monster: cM.monster,
+        holderNftToken: cM.token,
+        mhmMint,
+        holderMhmAta: getAssociatedTokenAddressSync(mhmMint, playerA.publicKey),
+        feeWallet: feeWallet.publicKey,
+        feeMhmAta: getAssociatedTokenAddressSync(mhmMint, feeWallet.publicKey),
+        holder: playerA.publicKey,
+        systemProgram: SystemProgram.programId,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+      })
+      .signers([playerA])
+      .rpc();
+    assert.equal((await program.account.monster.fetch(cM.monster)).level, 2);
+
+    const config = await program.account.gameConfig.fetch(configPda);
+    const id = config.battlesCreated.toNumber();
+    const [gm] = PublicKey.findProgramAddressSync(
+      [Buffer.from("match"), new BN(id).toArrayLike(Buffer, "le", 8)],
+      program.programId
+    );
+    const escrowC = getAssociatedTokenAddressSync(cM.mint, gm, true);
+    const escrowD = getAssociatedTokenAddressSync(dM.mint, gm, true);
+
+    await program.methods
+      .createMatch(new BN(id))
+      .accounts({
+        config: configPda,
+        grudgeMatch: gm,
+        monsterMint: cM.mint,
+        monster: cM.monster,
+        creatorNftToken: cM.token,
+        escrowNftToken: escrowC,
+        creator: playerA.publicKey,
+        systemProgram: SystemProgram.programId,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+      })
+      .signers([playerA])
+      .rpc();
+
+    await program.methods
+      .joinMatch()
+      .accounts({
+        grudgeMatch: gm,
+        monsterMint: dM.mint,
+        monster: dM.monster,
+        joinerNftToken: dM.token,
+        escrowNftToken: escrowD,
+        joiner: playerB.publicKey,
+        systemProgram: SystemProgram.programId,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+      })
+      .signers([playerB])
+      .rpc();
+
+    // Both NFTs are escrowed.
+    assert.equal((await getAccount(provider.connection, cM.token)).amount, 0n);
+    assert.equal((await getAccount(provider.connection, dM.token)).amount, 0n);
+
+    // Play: A attacks hard, B heals — A should sweep the games.
+    let state = await program.account.grudgeMatch.fetch(gm);
+    let guard = 0;
+    while ("active" in state.state && guard < 200) {
+      await program.methods
+        .submitMatchAction(2, 7) // Devour + PWR+
+        .accounts({ grudgeMatch: gm, player: playerA.publicKey })
+        .signers([playerA])
+        .rpc();
+      await program.methods
+        .submitMatchAction(5, 255) // Snack, no support
+        .accounts({ grudgeMatch: gm, player: playerB.publicKey })
+        .signers([playerB])
+        .rpc();
+      state = await program.account.grudgeMatch.fetch(gm);
+      guard++;
+    }
+    assert.isTrue("finished" in state.state, "match should finish");
+    assert.equal(state.winner, 0, "player A should win the match");
+    assert.equal(state.gameWins[0], 3);
+
+    // Settle: winner (A) takes BOTH NFTs.
+    const aGetsC = getAssociatedTokenAddressSync(cM.mint, playerA.publicKey);
+    const aGetsD = getAssociatedTokenAddressSync(dM.mint, playerA.publicKey);
+    await provider.sendAndConfirm(
+      new Transaction().add(
+        createAssociatedTokenAccountIdempotentInstruction(admin.publicKey, aGetsC, playerA.publicKey, cM.mint),
+        createAssociatedTokenAccountIdempotentInstruction(admin.publicKey, aGetsD, playerA.publicKey, dM.mint)
+      )
+    );
+    await program.methods
+      .settleMatch()
+      .accounts({
+        grudgeMatch: gm,
+        monsterMintA: cM.mint,
+        monsterMintB: dM.mint,
+        escrowA: escrowC,
+        escrowB: escrowD,
+        destA: aGetsC,
+        destB: aGetsD,
+        monsterA: cM.monster,
+        monsterB: dM.monster,
+        player0: playerA.publicKey,
+        player1: playerB.publicKey,
+        payer: playerA.publicKey,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .signers([playerA])
+      .rpc();
+
+    assert.equal((await getAccount(provider.connection, aGetsC)).amount, 1n);
+    assert.equal((await getAccount(provider.connection, aGetsD)).amount, 1n, "winner takes the loser's NFT");
+  });
 });
