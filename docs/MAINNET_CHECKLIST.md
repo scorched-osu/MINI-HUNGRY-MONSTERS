@@ -46,12 +46,13 @@ mainnet:
   (existing monsters update too — metadata is mutable, update authority is
   the program's config PDA).
 
-## 4. Final tokenomics — 🔴 needs your numbers
-Placeholders in `scripts/config.json` pending the mining-speed discussion:
-- Per-rarity mining ranges (`miningRateRangesMhmPerHour`).
-- `monsterPriceMhm`, `genesisPriceLamports`, `genesisRemaining`.
-- `burnBps` (70%), `battleFeeBps` (2.5%), `marketFeeBps` (2%).
-- Rarity odds (`rarityWeightsBps`).
+## 4. Final tokenomics — 🟡 mining rates locked; confirm the rest
+- ✅ Per-rarity mining ranges (`miningRateRangesMhmPerHour`) — finalized:
+  0.1–0.99 / 1–4.99 / 5–9.99 / 10–19.99 / 20–40 MHM/hr.
+- 🔴 Still using defaults, confirm before genesis:
+  `monsterPriceMhm` (100 MHM), `genesisPriceLamports` (0.1 SOL),
+  `genesisRemaining` (1000), `burnBps` (70%), `battleFeeBps` (2.5%),
+  `marketFeeBps` (2%), rarity odds `rarityWeightsBps` (60/25/10/4/1).
 All are tunable post-launch via `update_config`, but they should be
 deliberate before genesis. See `docs/TOKENOMICS.md`.
 

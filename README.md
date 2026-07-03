@@ -20,16 +20,17 @@ put your monster's entire unclaimed mining pot on the line in a
 Real SPL NFTs (supply 1, decimals 0) — trade them on any marketplace; whoever
 holds the token owns the monster and its mining pot. Each monster rolls:
 
-| Rarity | Odds (default) | Mining speed* |
+| Rarity | Odds (default) | Mining speed |
 |---|---|---|
-| STANDARD | 60% | 0.1 – 1 MHM/hr |
-| RARE | 25% | 1 – 3 MHM/hr |
-| EPIC | 10% | 3 – 7 MHM/hr |
-| LEGENDARY | 4% | 7 – 13 MHM/hr |
-| UNIQUE | 1% | 13+ MHM/hr |
+| STANDARD | 60% | 0.1 – 0.99 MHM/hr |
+| RARE | 25% | 1.00 – 4.99 MHM/hr |
+| EPIC | 10% | 5.00 – 9.99 MHM/hr |
+| LEGENDARY | 4% | 10.00 – 19.99 MHM/hr |
+| UNIQUE | 1% | 20+ MHM/hr |
 
-*Placeholder values — mining speeds, odds and prices live in an on-chain
-config the admin can tune at any time without redeploying.
+Mining speeds, odds and prices live in an on-chain config the admin can tune at
+any time without redeploying. (UNIQUE is the open-ended "20+" tier; the roll is
+capped at 40 MHM/hr in the shipped config.)
 
 Hatching is a two-step **commit → reveal**: you pay and commit, then reveal a
 moment later once a future block seals the roll. This makes rarity

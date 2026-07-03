@@ -30,17 +30,17 @@ changeable by the admin):
 | Battle rake | 2.5% of battle loot | Minted to the fee wallet on settlement |
 | Marketplace sale | 2% of the sale price | Transferred from the buyer's payment |
 
-## Mining speeds — PLACEHOLDER
+## Mining speeds
 
-Final numbers are still to be discussed. Current defaults (whole MHM/hour):
+Finalized rates (whole MHM/hour), rolled uniformly within each tier's range:
 
 | Tier | Range |
 |---|---|
-| STANDARD | 0.1 – 1 |
-| RARE | 1 – 3 |
-| EPIC | 3 – 7 |
-| LEGENDARY | 7 – 13 |
-| UNIQUE | 13 – 21 |
+| STANDARD | 0.1 – 0.99 |
+| RARE | 1.00 – 4.99 |
+| EPIC | 5.00 – 9.99 |
+| LEGENDARY | 10.00 – 19.99 |
+| UNIQUE | 20.00 – 40.00 (open-ended "20+" tier; 40 is the roll cap) |
 
 Every number on this page — ranges, odds, prices, burn %, rake — lives in the
 on-chain `GameConfig` and can be retuned by the admin via `update_config`
