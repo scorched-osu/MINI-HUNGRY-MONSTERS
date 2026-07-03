@@ -1,0 +1,39 @@
+{
+  "$comment": "Copy to scripts/config.json and fill in YOUR wallet addresses before running `npm run initialize`. All MHM amounts are in micro-MHM (1 MHM = 1000000).",
+
+  "feeWallet": "REPLACE_WITH_YOUR_FEE_RECIPIENT_WALLET_ADDRESS",
+
+  "initialMhmHolders": [
+    {
+      "$comment": "Wallets that receive an initial MHM allocation at launch (team / treasury / liquidity). Add one entry per holder wallet.",
+      "address": "REPLACE_WITH_HOLDER_WALLET_ADDRESS",
+      "amountMhm": 1000000
+    }
+  ],
+
+  "burnBps": 7000,
+  "battleFeeBps": 250,
+  "marketFeeBps": 200,
+  "levelUpBaseCost": 1000000,
+  "metadataBaseUri": "https://raw.githubusercontent.com/scorched-osu/MINI-HUNGRY-MONSTERS/main/assets/metadata/",
+  "monsterPriceMhm": 100000000,
+  "genesisPriceLamports": 100000000,
+  "genesisRemaining": 1000,
+
+  "miningRateRangesMhmPerHour": {
+    "$comment": "Whole MHM per hour per rarity [min, max]. unique is the open-ended '20+' tier; the max is the roll cap. Tunable via update_config without redeploying.",
+    "standard": [0.1, 0.99],
+    "rare": [1.0, 4.99],
+    "epic": [5.0, 9.99],
+    "legendary": [10.0, 19.99],
+    "unique": [20.0, 40.0]
+  },
+
+  "rarityWeightsBps": {
+    "standard": 6000,
+    "rare": 2500,
+    "epic": 1000,
+    "legendary": 400,
+    "unique": 100
+  }
+}

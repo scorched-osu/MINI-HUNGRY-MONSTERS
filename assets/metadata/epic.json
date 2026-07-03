@@ -1,0 +1,22 @@
+{
+  "name": "Mini Hungry Monster — Epic",
+  "symbol": "MHM",
+  "description": "A epic-tier MINI-HUNGRY-MONSTER. It idles, it mines MHM coin, and it will bet its entire mining pot in battle. Feed responsibly.",
+  "image": "https://raw.githubusercontent.com/scorched-osu/MINI-HUNGRY-MONSTERS/main/assets/images/epic.svg",
+  "external_url": "https://github.com/scorched-osu/MINI-HUNGRY-MONSTERS",
+  "attributes": [
+    {
+      "trait_type": "Rarity",
+      "value": "Epic"
+    }
+  ],
+  "properties": {
+    "files": [
+      {
+        "uri": "https://raw.githubusercontent.com/scorched-osu/MINI-HUNGRY-MONSTERS/main/assets/images/epic.svg",
+        "type": "image/svg+xml"
+      }
+    ],
+    "category": "image"
+  }
+}

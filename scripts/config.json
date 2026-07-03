@@ -1,0 +1,43 @@
+{
+  "$comment": "Live deploy config, consumed by `npm run initialize`. All MHM amounts are in whole MHM unless suffixed otherwise; 1 MHM = 1000000 micro-MHM on-chain.",
+
+  "feeWallet": "CzkwjAD9ADyeQujGQViCkJjhNAswuimgbXmtP7gE4nBG",
+
+  "initialMhmHolders": [
+    {
+      "address": "CzkwjAD9ADyeQujGQViCkJjhNAswuimgbXmtP7gE4nBG",
+      "amountMhm": 1000000
+    },
+    {
+      "address": "6UYidbhppbFHRMYfeM6cM1cyvhZFrpGYJLJYz9FQMWMB",
+      "amountMhm": 500000
+    }
+  ],
+
+  "burnBps": 7000,
+  "battleFeeBps": 250,
+  "marketFeeBps": 200,
+  "levelUpBaseCost": 1000000,
+  "$levelUpComment": "Base micro-MHM cost unit (1 MHM). Level cost = base * rarityMult(1/2/4/8/16) * currentLevel. Cap 20. Standard maxes for ~190 MHM, Unique ~3040 MHM.",
+  "metadataBaseUri": "https://raw.githubusercontent.com/scorched-osu/MINI-HUNGRY-MONSTERS/main/assets/metadata/",
+  "monsterPriceMhm": 100000000,
+  "genesisPriceLamports": 100000000,
+  "genesisRemaining": 1000,
+
+  "miningRateRangesMhmPerHour": {
+    "$comment": "Finalized mining speeds (whole MHM per hour). unique is the open-ended '20+' tier; 40 is the roll cap and is tunable via update_config without redeploying.",
+    "standard": [0.1, 0.99],
+    "rare": [1.0, 4.99],
+    "epic": [5.0, 9.99],
+    "legendary": [10.0, 19.99],
+    "unique": [20.0, 40.0]
+  },
+
+  "rarityWeightsBps": {
+    "standard": 6000,
+    "rare": 2500,
+    "epic": 1000,
+    "legendary": 400,
+    "unique": 100
+  }
+}

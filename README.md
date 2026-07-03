@@ -1,3 +1,181 @@
-# MINI-HUNGRY-MONSTERS
+# MINI-HUNGRY-MONSTERS 👾🍖
 
-Idle NFT mining + turn-based battle game on Solana.
+An idle NFT mining + turn-based battle game on Solana.
+
+Your MINI-HUNGRY-MONSTER NFTs passively **mine MHM coin** (mini-hungry-monster
+coin) just by sitting in your wallet. Spend MHM to hatch more monsters — or
+put your monster's entire unclaimed mining pot on the line in a
+**winner-take-all battle**.
+
+## How it works
+
+### 🪙 MHM coin
+- SPL token with 6 decimals, minted only by the game program (the mint
+  authority is a program PDA).
+- Earned by holding monster NFTs (idle mining) and by winning battles.
+- Spent on hatching new monsters (a configurable share of every purchase is
+  **burned**, the rest goes to the fee wallet).
+
+### 🥚 Monsters
+Real SPL NFTs (supply 1, decimals 0) — trade them on any marketplace; whoever
+holds the token owns the monster and its mining pot. Each monster rolls:
+
+| Rarity | Odds (default) | Mining speed |
+|---|---|---|
+| STANDARD | 60% | 0.1 – 0.99 MHM/hr |
+| RARE | 25% | 1.00 – 4.99 MHM/hr |
+| EPIC | 10% | 5.00 – 9.99 MHM/hr |
+| LEGENDARY | 4% | 10.00 – 19.99 MHM/hr |
+| UNIQUE | 1% | 20+ MHM/hr |
+
+Mining speeds, odds and prices live in an on-chain config the admin can tune at
+any time without redeploying. (UNIQUE is the open-ended "20+" tier; the roll is
+capped at 40 MHM/hr in the shipped config.)
+
+Hatching is a two-step **commit → reveal**: you pay and commit, then reveal a
+moment later once a future block seals the roll. This makes rarity
+unpredictable at payment time and impossible to grind. See
+[docs/GAME_DESIGN.md](docs/GAME_DESIGN.md).
+
+### ⛏️ Idle mining
+Every monster accrues MHM continuously based on its rolled mining speed.
+`claim_mining` mints everything accrued to the current NFT holder. Unclaimed
+MHM stays banked on the monster… which is exactly what you wager in battle.
+
+### ⚔️ Battles — HIGH RISK, high reward
+- Creating/joining a battle locks your monster and stakes its **entire
+  unclaimed mining pot**.
+- Turn-based combat with a **90-second clock** per turn to submit actions.
+  Miss the deadline while your opponent submitted? They can claim the win.
+- Each turn you pick **one CONSUMABLE** action and optionally **one SUPPORT**:
+
+| Slot | Type | Actions | Effect |
+|---|---|---|---|
+| CONSUMABLE | DPS | Nibble / Chomp / Devour | Deal damage (60/100/150% of POWER) |
+| CONSUMABLE | DEF | Harden Shell / Iron Belly | +25 def for 2 turns / +50 def for 1 turn |
+| CONSUMABLE | HP+ | Snack / Feast | Heal 20% / 40% of max HP |
+| SUPPORT | SUPP | PWR+ / GUARD+ / MEND+ | +50% to a matching DPS / DEF / HP+ consumable |
+
+A support only amplifies a consumable of its matching type — pairing MEND+
+with an attack does nothing.
+
+- **When you win, you receive the loser's entire mining pot** (minus a small
+  configurable rake to the fee wallet), minted straight to your wallet.
+
+### 🩸 Grudge Matches — NFT on the line
+The highest-stakes mode: both players **escrow their monster NFT** and play a
+**best of 5**. Win and you take your opponent's monster; lose and yours is gone
+for good. Higher rarities hit harder, strike faster, and LEGENDARY+ get special
+traits that bite lower-rarity foes — but **level up** your monster (MHM cost
+scales with rarity) and a lower tier can still upset a higher one.
+
+### 🛒 Marketplace
+List your monsters for sale priced in MHM: the NFT sits in an on-chain escrow
+until bought (2% fee to the fee wallet, rest to you) or delisted. The
+monster's unclaimed mining pot travels with it to the buyer. Being plain SPL
+NFTs, monsters can also trade on any external marketplace.
+
+## Repository layout
+
+```
+programs/mhm-game/     Anchor on-chain program (token, NFTs, mining, battles)
+  src/state.rs         Accounts: GameConfig, Monster, Battle
+  src/actions.rs       The action catalog (CONSUMABLE / SUPPORT slots)
+  src/combat.rs        Turn resolution engine + unit tests
+  src/rng.rs           Mint-roll randomness (swap for a VRF before mainnet!)
+app/                   Web client (Vite + React + wallet adapter)
+tests/                 Anchor integration tests (localnet)
+scripts/               initialize.ts + config for fee wallet & MHM allocations
+docs/                  Game design + tokenomics notes
+```
+
+## Getting started
+
+Prereqs: Rust, [Solana CLI](https://docs.solanalabs.com/cli/install),
+[Anchor 0.31.1](https://www.anchor-lang.com/docs/installation), Node 18+.
+
+```bash
+npm install
+anchor build          # build the program + IDL
+anchor test           # spins up a localnet and runs tests/mhm-game.ts
+cargo test -p mhm-game --lib   # combat engine unit tests (no validator needed)
+```
+
+## Local playtest (see the game in a browser)
+
+```bash
+# 0. One-time: wallet + point the CLI at localnet
+solana-keygen new --no-bip39-passphrase   # skip if you already have one
+solana config set --url localhost
+
+# 1. Make the program id YOURS (first build generates a keypair; sync
+#    rewrites declare_id + Anchor.toml to match, then rebuild)
+anchor build && anchor keys sync && anchor build
+
+# 2. Terminal 2: local validator (cloning Metaplex Token Metadata, which
+#    monster minting CPIs into — needs internet the first time)
+solana-test-validator \
+  --clone metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s \
+  --url https://api.mainnet-beta.solana.com
+
+# 3. Deploy + initialize (fund your CLI wallet first)
+solana airdrop 10
+anchor deploy
+npm install
+# TIP: for a fun demo, crank miningRateRangesMhmPerHour way up in
+# scripts/config.json (e.g. "standard": [3600, 7200]) before this step:
+ANCHOR_PROVIDER_URL=http://127.0.0.1:8899 ANCHOR_WALLET=~/.config/solana/id.json \
+npm run initialize
+
+# 4. Refresh the IDL the app uses (program id changed in step 1!)
+anchor idl build --program-name mhm_game -o app/src/idl/mhm_game.json
+
+# 5. Run the app
+cd app && npm install && npm run dev    # http://localhost:5173
+```
+
+In Phantom: Settings → Developer Settings → enable Testnet Mode and select
+**Localhost**, then fund it: `solana airdrop 5 <your-phantom-address>`.
+Connect, hatch a monster, watch it mine. To try a battle you need a second
+wallet (second browser profile, or Solflare) with its own SOL + monster —
+open a battle from one, join and fight from the other.
+
+### Deploying & initializing
+
+```bash
+cp scripts/config.example.json scripts/config.json
+# edit scripts/config.json: set feeWallet + initialMhmHolders to YOUR addresses
+anchor deploy --provider.cluster devnet
+ANCHOR_PROVIDER_URL=https://api.devnet.solana.com \
+ANCHOR_WALLET=~/.config/solana/id.json \
+npm run initialize
+```
+
+- `feeWallet` receives **all fees**: genesis SOL payments, the non-burned
+  share of MHM monster purchases, and the battle rake.
+- `initialMhmHolders` each receive their MHM allocation at launch via the
+  admin-only `admin_mint_mhm` instruction.
+
+### Playing (web client)
+
+```bash
+cd app
+npm install
+VITE_RPC_URL=https://api.devnet.solana.com npm run dev   # defaults to localnet
+```
+
+Connect Phantom or Solflare, hatch a monster, watch it mine, and hit the
+Arena tab to battle. If you change the on-chain program, regenerate the IDL
+the app uses: `anchor idl build --program-name mhm_game -o app/src/idl/mhm_game.json`.
+
+## ⚠️ Before mainnet
+
+- **Randomness**: mint rolls use clock/slot-derived pseudo-randomness — fine
+  for devnet, grindable on mainnet. Swap `rng.rs` for Switchboard VRF.
+- **Artwork/metadata hosting**: monsters mint with Metaplex metadata pointing
+  at placeholder art in `assets/` served from GitHub; move to Arweave/IPFS
+  and real art for mainnet.
+- **Audit**: this program moves value and has not been audited.
+
+See [docs/GAME_DESIGN.md](docs/GAME_DESIGN.md) and
+[docs/TOKENOMICS.md](docs/TOKENOMICS.md) for the full design.
