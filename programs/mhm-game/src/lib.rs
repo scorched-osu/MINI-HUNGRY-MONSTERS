@@ -26,6 +26,7 @@ use anchor_spl::token::{
 
 pub mod actions;
 pub mod combat;
+pub mod combat_stats;
 pub mod errors;
 pub mod rng;
 pub mod state;
@@ -61,6 +62,7 @@ pub mod mhm_game {
         config.burn_bps = params.burn_bps;
         config.battle_fee_bps = params.battle_fee_bps;
         config.market_fee_bps = params.market_fee_bps;
+        config.level_up_base_cost = params.level_up_base_cost;
         config.metadata_base_uri = params.metadata_base_uri;
         config.monster_price_mhm = params.monster_price_mhm;
         config.genesis_price_lamports = params.genesis_price_lamports;
@@ -112,6 +114,9 @@ pub mod mhm_game {
         if let Some(market_fee_bps) = params.market_fee_bps {
             require!(market_fee_bps <= 10_000, MhmError::BadBps);
             config.market_fee_bps = market_fee_bps;
+        }
+        if let Some(level_up_base_cost) = params.level_up_base_cost {
+            config.level_up_base_cost = level_up_base_cost;
         }
         if let Some(metadata_base_uri) = params.metadata_base_uri {
             require!(metadata_base_uri.len() <= 160, MhmError::UriTooLong);
@@ -334,6 +339,47 @@ pub mod mhm_game {
         Ok(())
     }
 
+    /// Level up a monster (+1 level, up to MAX_LEVEL), raising its battle
+    /// stats. The MHM cost scales with rarity and current level (cheap for low
+    /// tiers, steep for high tiers) and is paid to the fee wallet.
+    pub fn level_up(ctx: Context<LevelUp>) -> Result<()> {
+        let config = &ctx.accounts.config;
+        let monster = &mut ctx.accounts.monster;
+        require!(!monster.in_battle, MhmError::MonsterInBattle);
+        require!(
+            monster.level < combat_stats::MAX_LEVEL,
+            MhmError::MaxLevelReached
+        );
+
+        let cost = combat_stats::level_up_cost(
+            config.level_up_base_cost,
+            monster.rarity.index(),
+            monster.level,
+        );
+        if cost > 0 {
+            token::transfer(
+                CpiContext::new(
+                    ctx.accounts.token_program.to_account_info(),
+                    Transfer {
+                        from: ctx.accounts.holder_mhm_ata.to_account_info(),
+                        to: ctx.accounts.fee_mhm_ata.to_account_info(),
+                        authority: ctx.accounts.holder.to_account_info(),
+                    },
+                ),
+                cost,
+            )?;
+        }
+
+        monster.level += 1;
+        emit!(MonsterLeveledUp {
+            monster: monster.mint,
+            holder: ctx.accounts.holder.key(),
+            level: monster.level,
+            cost,
+        });
+        Ok(())
+    }
+
     /// Open a battle challenge. HIGH RISK: the monster's entire unclaimed
     /// mining pot goes on the line the moment the challenge is created.
     pub fn create_battle(ctx: Context<CreateBattle>, battle_id: u64) -> Result<()> {
@@ -359,10 +405,13 @@ pub mod mhm_game {
         battle.players[0] = ctx.accounts.creator.key();
         battle.monsters[0] = monster.mint;
         battle.pots[0] = pot;
-        battle.hp[0] = monster.max_hp;
-        battle.max_hp[0] = monster.max_hp;
-        battle.power[0] = monster.power;
-        battle.defense[0] = monster.defense;
+        // Snapshot fighter inputs; effective stats are built at join, once both
+        // rarities are known (traits depend on the opponent's rarity).
+        battle.rarity[0] = monster.rarity.index() as u8;
+        battle.level[0] = monster.level;
+        battle.base_hp[0] = monster.max_hp;
+        battle.base_power[0] = monster.power;
+        battle.base_defense[0] = monster.defense;
         battle.winner = NONE_U8;
         battle.bump = ctx.bumps.battle;
 
@@ -402,12 +451,22 @@ pub mod mhm_game {
         battle.players[1] = ctx.accounts.joiner.key();
         battle.monsters[1] = monster.mint;
         battle.pots[1] = pot;
-        battle.hp[1] = monster.max_hp;
-        battle.max_hp[1] = monster.max_hp;
-        battle.power[1] = monster.power;
-        battle.defense[1] = monster.defense;
-        battle.turn = 1;
-        battle.deadline = now + TURN_DEADLINE_SECS;
+        battle.rarity[1] = monster.rarity.index() as u8;
+        battle.level[1] = monster.level;
+        battle.base_hp[1] = monster.max_hp;
+        battle.base_power[1] = monster.power;
+        battle.base_defense[1] = monster.defense;
+
+        // Build both fighters (each vs the other's rarity) and open the board.
+        let f0 = combat_stats::fighter(
+            battle.base_hp[0], battle.base_power[0], battle.base_defense[0],
+            battle.rarity[0] as usize, battle.level[0], battle.rarity[1] as usize,
+        );
+        let f1 = combat_stats::fighter(
+            battle.base_hp[1], battle.base_power[1], battle.base_defense[1],
+            battle.rarity[1] as usize, battle.level[1], battle.rarity[0] as usize,
+        );
+        battle.board = Combat::new(&f0, &f1, now + TURN_DEADLINE_SECS);
 
         emit!(BattleJoined {
             battle: battle.key(),
@@ -426,12 +485,12 @@ pub mod mhm_game {
         let now = Clock::get()?.unix_timestamp;
         let battle = &mut ctx.accounts.battle;
         require!(battle.state == BattleState::Active, MhmError::BattleNotActive);
-        require!(now <= battle.deadline, MhmError::TurnDeadlinePassed);
+        require!(now <= battle.board.deadline, MhmError::TurnDeadlinePassed);
 
         let side = battle
             .side_of(&ctx.accounts.player.key())
             .ok_or(MhmError::NotABattlePlayer)?;
-        require!(!battle.pending[side].submitted, MhmError::AlreadySubmitted);
+        require!(!battle.board.pending[side].submitted, MhmError::AlreadySubmitted);
 
         let consumable_def = get_action(consumable).ok_or(MhmError::UnknownAction)?;
         require!(
@@ -443,18 +502,20 @@ pub mod mhm_game {
             require!(support_def.slot == ActionSlot::Support, MhmError::NotASupport);
         }
 
-        battle.pending[side] = PendingAction { submitted: true, consumable, support };
+        battle.board.pending[side] = PendingAction { submitted: true, consumable, support };
 
-        if battle.pending[0].submitted && battle.pending[1].submitted {
-            let turn = battle.turn;
-            combat::resolve_turn(battle, now);
+        if battle.board.pending[0].submitted && battle.board.pending[1].submitted {
+            let turn = battle.board.turn;
+            let outcome = combat::resolve_turn(&mut battle.board, now);
             emit!(TurnResolved {
                 battle: battle.key(),
                 turn,
-                hp: battle.hp,
+                hp: battle.board.hp,
             });
-            if battle.state == BattleState::Finished {
-                emit!(BattleFinished { battle: battle.key(), winner: battle.winner });
+            if let Some(winner) = combat::outcome_winner(outcome) {
+                battle.state = BattleState::Finished;
+                battle.winner = winner;
+                emit!(BattleFinished { battle: battle.key(), winner });
             }
         }
         Ok(())
@@ -467,16 +528,16 @@ pub mod mhm_game {
         let now = Clock::get()?.unix_timestamp;
         let battle = &mut ctx.accounts.battle;
         require!(battle.state == BattleState::Active, MhmError::BattleNotActive);
-        require!(now > battle.deadline, MhmError::DeadlineNotReached);
+        require!(now > battle.board.deadline, MhmError::DeadlineNotReached);
 
         let side = battle
             .side_of(&ctx.accounts.player.key())
             .ok_or(MhmError::NotABattlePlayer)?;
         let opponent = 1 - side;
 
-        if battle.pending[side].submitted && !battle.pending[opponent].submitted {
+        if battle.board.pending[side].submitted && !battle.board.pending[opponent].submitted {
             battle.winner = side as u8;
-        } else if !battle.pending[side].submitted && !battle.pending[opponent].submitted {
+        } else if !battle.board.pending[side].submitted && !battle.board.pending[opponent].submitted {
             battle.winner = DRAW;
         } else {
             return err!(MhmError::CallerDidNotSubmit);
@@ -811,6 +872,7 @@ fn finalize_monster<'info>(
     monster.mint = monster_mint.key();
     monster.id = monster_id;
     monster.rarity = rolled.rarity;
+    monster.level = 1;
     monster.mining_rate = rolled.mining_rate;
     monster.last_settled_ts = now;
     monster.unclaimed = 0;
@@ -904,6 +966,8 @@ pub struct InitializeParams {
     pub battle_fee_bps: u16,
     /// Fee on marketplace sales, in basis points.
     pub market_fee_bps: u16,
+    /// Base micro-MHM cost unit for leveling up (scaled by rarity + level).
+    pub level_up_base_cost: u64,
     /// Base URI for NFT metadata (should end with '/'); "<rarity>.json" is appended.
     pub metadata_base_uri: String,
     pub monster_price_mhm: u64,
@@ -919,6 +983,7 @@ pub struct UpdateConfigParams {
     pub burn_bps: Option<u16>,
     pub battle_fee_bps: Option<u16>,
     pub market_fee_bps: Option<u16>,
+    pub level_up_base_cost: Option<u64>,
     pub metadata_base_uri: Option<String>,
     pub monster_price_mhm: Option<u64>,
     pub genesis_price_lamports: Option<u64>,
@@ -1170,6 +1235,57 @@ pub struct ClaimMining<'info> {
         associated_token::authority = holder,
     )]
     pub holder_mhm_ata: Account<'info, TokenAccount>,
+
+    #[account(mut)]
+    pub holder: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+    pub token_program: Program<'info, Token>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+}
+
+#[derive(Accounts)]
+pub struct LevelUp<'info> {
+    #[account(seeds = [CONFIG_SEED], bump = config.bump)]
+    pub config: Account<'info, GameConfig>,
+
+    #[account(
+        mut,
+        seeds = [MONSTER_SEED, monster.mint.as_ref()],
+        bump = monster.bump
+    )]
+    pub monster: Account<'info, Monster>,
+
+    /// Proof of ownership: the holder's token account for this monster's NFT.
+    #[account(
+        constraint = holder_nft_token.mint == monster.mint @ MhmError::NotMonsterHolder,
+        constraint = holder_nft_token.owner == holder.key() @ MhmError::NotMonsterHolder,
+        constraint = holder_nft_token.amount == 1 @ MhmError::NotMonsterHolder,
+    )]
+    pub holder_nft_token: Account<'info, TokenAccount>,
+
+    #[account(seeds = [MHM_MINT_SEED], bump, address = config.mhm_mint)]
+    pub mhm_mint: Account<'info, Mint>,
+
+    /// Holder's MHM account; the level-up cost is taken from here.
+    #[account(
+        mut,
+        associated_token::mint = mhm_mint,
+        associated_token::authority = holder,
+    )]
+    pub holder_mhm_ata: Account<'info, TokenAccount>,
+
+    /// CHECK: the configured fee wallet (receives the level-up fee).
+    #[account(address = config.fee_wallet)]
+    pub fee_wallet: UncheckedAccount<'info>,
+
+    #[account(
+        init_if_needed,
+        payer = holder,
+        associated_token::mint = mhm_mint,
+        associated_token::authority = fee_wallet,
+    )]
+    pub fee_mhm_ata: Account<'info, TokenAccount>,
 
     #[account(mut)]
     pub holder: Signer<'info>,
@@ -1543,6 +1659,14 @@ pub struct MiningClaimed {
     pub monster: Pubkey,
     pub holder: Pubkey,
     pub amount: u64,
+}
+
+#[event]
+pub struct MonsterLeveledUp {
+    pub monster: Pubkey,
+    pub holder: Pubkey,
+    pub level: u16,
+    pub cost: u64,
 }
 
 #[event]

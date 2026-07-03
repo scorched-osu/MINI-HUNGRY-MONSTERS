@@ -96,6 +96,9 @@ pub struct GameConfig {
     pub battle_fee_bps: u16,
     /// Fee on marketplace sales (basis points), sent to `fee_wallet`.
     pub market_fee_bps: u16,
+    /// Base MHM (micro-MHM) cost unit for leveling up a monster; the actual
+    /// cost scales by rarity and current level (see combat_stats::level_up_cost).
+    pub level_up_base_cost: u64,
     /// Price in micro-MHM to buy (hatch) a new monster with MHM.
     pub monster_price_mhm: u64,
     /// Lamport price for genesis hatches (bootstraps the economy before MHM circulates).
@@ -130,6 +133,8 @@ pub struct Monster {
     pub mint: Pubkey,
     pub id: u64,
     pub rarity: Rarity,
+    /// Level (1..=MAX_LEVEL). Raises battle stats; leveled via `level_up`.
+    pub level: u16,
     /// Mining speed in micro-MHM per hour.
     pub mining_rate: u64,
     /// Timestamp mining last settled from.
@@ -212,6 +217,47 @@ pub struct PendingAction {
     pub support: u8,
 }
 
+/// The mutable state of a single turn-based fight between two monsters. Shared
+/// by the quick pot-stake `Battle` and each game of an NFT-staked `Match`, so
+/// the combat engine (see `combat.rs`) has one implementation.
+///
+/// Per-side stats are the effective (level-scaled, trait-adjusted) values
+/// computed by `combat_stats::fighter` when the two sides lock in.
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Default, InitSpace)]
+pub struct Combat {
+    pub hp: [u32; 2],
+    pub max_hp: [u32; 2],
+    pub power: [u32; 2],
+    pub defense: [u32; 2],
+    /// Attack speed; the faster side lands its DPS first each turn.
+    pub speed: [u32; 2],
+    /// Trait bonus to DPS damage vs the opponent, in basis points.
+    pub dmg_bonus_bps: [u16; 2],
+    /// Fraction of the opponent's defense ignored on DPS, in basis points.
+    pub defense_pierce_bps: [u16; 2],
+    /// Strike-first override (UNIQUE trait vs lower rarity).
+    pub always_first: [bool; 2],
+    /// Temporary defense buff from DEF actions.
+    pub def_buff: [u32; 2],
+    /// Turns the defense buff has left.
+    pub def_buff_turns: [u8; 2],
+    pub pending: [PendingAction; 2],
+    pub turn: u16,
+    /// Unix time by which both players must have submitted this turn's actions.
+    pub deadline: i64,
+}
+
+/// Outcome of resolving one turn.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum TurnOutcome {
+    /// Fight continues; `turn`/`deadline`/`pending` have advanced.
+    Continue,
+    /// Side 0 or 1 won this game.
+    Win(u8),
+    /// Both KO'd simultaneously, or a tie on the turn cap.
+    Draw,
+}
+
 /// One battle between two monsters. Index 0 = challenger, 1 = joiner.
 #[account]
 #[derive(InitSpace)]
@@ -224,21 +270,53 @@ pub struct Battle {
     pub monsters: [Pubkey; 2],
     /// micro-MHM at stake per side: the monster's whole unclaimed mining pot.
     pub pots: [u64; 2],
-    pub hp: [u32; 2],
-    pub max_hp: [u32; 2],
-    pub power: [u32; 2],
-    pub defense: [u32; 2],
-    /// Temporary defense buff from DEF actions.
-    pub def_buff: [u32; 2],
-    /// Turns the defense buff has left.
-    pub def_buff_turns: [u8; 2],
-    pub pending: [PendingAction; 2],
-    pub turn: u16,
-    /// Unix time by which both players must have submitted this turn's actions.
-    pub deadline: i64,
+    /// Fighter inputs snapshotted per side (rarity index, level, base stats),
+    /// so effective stats + traits can be built once both sides are known.
+    pub rarity: [u8; 2],
+    pub level: [u16; 2],
+    pub base_hp: [u32; 2],
+    pub base_power: [u32; 2],
+    pub base_defense: [u32; 2],
+    pub board: Combat,
     /// 0 or 1 = winning side, DRAW (2) = draw, NONE_U8 = undecided.
     pub winner: u8,
     pub bump: u8,
+}
+
+impl Combat {
+    /// Build a fresh board from two resolved fighters, starting turn 1 with the
+    /// given deadline.
+    pub fn new(
+        a: &crate::combat_stats::Fighter,
+        b: &crate::combat_stats::Fighter,
+        deadline: i64,
+    ) -> Combat {
+        Combat {
+            hp: [a.max_hp, b.max_hp],
+            max_hp: [a.max_hp, b.max_hp],
+            power: [a.power, b.power],
+            defense: [a.defense, b.defense],
+            speed: [a.speed, b.speed],
+            dmg_bonus_bps: [a.dmg_bonus_bps, b.dmg_bonus_bps],
+            defense_pierce_bps: [a.defense_pierce_bps, b.defense_pierce_bps],
+            always_first: [a.always_first, b.always_first],
+            def_buff: [0, 0],
+            def_buff_turns: [0, 0],
+            pending: Default::default(),
+            turn: 1,
+            deadline,
+        }
+    }
+
+    /// Reset HP/buffs/pending for the next game of a match, keeping stats.
+    pub fn reset_for_next_game(&mut self, deadline: i64) {
+        self.hp = self.max_hp;
+        self.def_buff = [0, 0];
+        self.def_buff_turns = [0, 0];
+        self.pending = Default::default();
+        self.turn = 1;
+        self.deadline = deadline;
+    }
 }
 
 impl Battle {

@@ -1984,6 +1984,299 @@
       "args": []
     },
     {
+      "name": "level_up",
+      "docs": [
+        "Level up a monster (+1 level, up to MAX_LEVEL), raising its battle",
+        "stats. The MHM cost scales with rarity and current level (cheap for low",
+        "tiers, steep for high tiers) and is paid to the fee wallet."
+      ],
+      "discriminator": [
+        128,
+        64,
+        197,
+        116,
+        226,
+        129,
+        119,
+        234
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "monster",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  111,
+                  110,
+                  115,
+                  116,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "monster.mint",
+                "account": "Monster"
+              }
+            ]
+          }
+        },
+        {
+          "name": "holder_nft_token",
+          "docs": [
+            "Proof of ownership: the holder's token account for this monster's NFT."
+          ]
+        },
+        {
+          "name": "mhm_mint",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  104,
+                  109,
+                  45,
+                  109,
+                  105,
+                  110,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "holder_mhm_ata",
+          "docs": [
+            "Holder's MHM account; the level-up cost is taken from here."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "holder"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mhm_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "fee_wallet"
+        },
+        {
+          "name": "fee_mhm_ata",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "fee_wallet"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mhm_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "holder",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "list_monster",
       "docs": [
         "List a monster for sale at an MHM price. The NFT moves into a program",
@@ -2869,6 +3162,19 @@
       ]
     },
     {
+      "name": "MonsterLeveledUp",
+      "discriminator": [
+        200,
+        19,
+        186,
+        6,
+        15,
+        38,
+        210,
+        101
+      ]
+    },
+    {
       "name": "MonsterListed",
       "discriminator": [
         94,
@@ -2964,136 +3270,141 @@
     },
     {
       "code": 6008,
+      "name": "MaxLevelReached",
+      "msg": "Monster is already at the maximum level"
+    },
+    {
+      "code": 6009,
       "name": "BattleNotOpen",
       "msg": "Battle is not open for joining"
     },
     {
-      "code": 6009,
+      "code": 6010,
       "name": "BattleNotActive",
       "msg": "Battle is not active"
     },
     {
-      "code": 6010,
+      "code": 6011,
       "name": "BattleNotFinished",
       "msg": "Battle is not finished"
     },
     {
-      "code": 6011,
+      "code": 6012,
       "name": "NotABattlePlayer",
       "msg": "You are not a player in this battle"
     },
     {
-      "code": 6012,
+      "code": 6013,
       "name": "CannotBattleSelf",
       "msg": "You cannot battle your own monster"
     },
     {
-      "code": 6013,
+      "code": 6014,
       "name": "UnknownAction",
       "msg": "Unknown action id"
     },
     {
-      "code": 6014,
+      "code": 6015,
       "name": "NotAConsumable",
       "msg": "That action does not fit in the consumable slot"
     },
     {
-      "code": 6015,
+      "code": 6016,
       "name": "NotASupport",
       "msg": "That action does not fit in the support slot"
     },
     {
-      "code": 6016,
+      "code": 6017,
       "name": "AlreadySubmitted",
       "msg": "Actions already submitted for this turn"
     },
     {
-      "code": 6017,
+      "code": 6018,
       "name": "TurnDeadlinePassed",
       "msg": "The 90 second turn deadline has passed"
     },
     {
-      "code": 6018,
+      "code": 6019,
       "name": "DeadlineNotReached",
       "msg": "The turn deadline has not passed yet"
     },
     {
-      "code": 6019,
+      "code": 6020,
       "name": "CallerDidNotSubmit",
       "msg": "You did not submit an action this turn, so you cannot claim the timeout win"
     },
     {
-      "code": 6020,
+      "code": 6021,
       "name": "NotBattleCreator",
       "msg": "Only the battle creator can cancel"
     },
     {
-      "code": 6021,
+      "code": 6022,
       "name": "BadWinnerAccount",
       "msg": "Winner token account does not belong to the winning player"
     },
     {
-      "code": 6022,
+      "code": 6023,
       "name": "MissingWinnerAccount",
       "msg": "Missing winner token account"
     },
     {
-      "code": 6023,
+      "code": 6024,
       "name": "BadBps",
       "msg": "Basis points value cannot exceed 10000"
     },
     {
-      "code": 6024,
+      "code": 6025,
       "name": "BadFeeAccount",
       "msg": "Fee token account does not belong to the configured fee wallet"
     },
     {
-      "code": 6025,
+      "code": 6026,
       "name": "MissingFeeAccount",
       "msg": "Missing fee token account"
     },
     {
-      "code": 6026,
+      "code": 6027,
       "name": "UriTooLong",
       "msg": "Metadata base URI is too long (max 160 bytes)"
     },
     {
-      "code": 6027,
+      "code": 6028,
       "name": "RevealTooEarly",
       "msg": "The reveal slot has not been produced yet; try again shortly"
     },
     {
-      "code": 6028,
+      "code": 6029,
       "name": "RevealExpired",
       "msg": "The reveal slot's hash is no longer available; this hatch has expired"
     },
     {
-      "code": 6029,
+      "code": 6030,
       "name": "PendingMintMismatch",
       "msg": "Pending mint does not match the provided monster mint"
     },
     {
-      "code": 6030,
+      "code": 6031,
       "name": "BadSlotHashes",
       "msg": "Invalid SlotHashes sysvar account"
     },
     {
-      "code": 6031,
+      "code": 6032,
       "name": "BadPrice",
       "msg": "Listing price must be greater than zero"
     },
     {
-      "code": 6032,
+      "code": 6033,
       "name": "NotSeller",
       "msg": "Only the seller can cancel this listing"
     },
     {
-      "code": 6033,
+      "code": 6034,
       "name": "Unauthorized",
       "msg": "Unauthorized: admin only"
     },
     {
-      "code": 6034,
+      "code": 6035,
       "name": "Overflow",
       "msg": "Arithmetic overflow"
     }
@@ -3156,57 +3467,10 @@
             }
           },
           {
-            "name": "hp",
-            "type": {
-              "array": [
-                "u32",
-                2
-              ]
-            }
-          },
-          {
-            "name": "max_hp",
-            "type": {
-              "array": [
-                "u32",
-                2
-              ]
-            }
-          },
-          {
-            "name": "power",
-            "type": {
-              "array": [
-                "u32",
-                2
-              ]
-            }
-          },
-          {
-            "name": "defense",
-            "type": {
-              "array": [
-                "u32",
-                2
-              ]
-            }
-          },
-          {
-            "name": "def_buff",
+            "name": "rarity",
             "docs": [
-              "Temporary defense buff from DEF actions."
-            ],
-            "type": {
-              "array": [
-                "u32",
-                2
-              ]
-            }
-          },
-          {
-            "name": "def_buff_turns",
-            "docs": [
-              "Turns the defense buff has left."
+              "Fighter inputs snapshotted per side (rarity index, level, base stats),",
+              "so effective stats + traits can be built once both sides are known."
             ],
             "type": {
               "array": [
@@ -3216,28 +3480,48 @@
             }
           },
           {
-            "name": "pending",
+            "name": "level",
             "type": {
               "array": [
-                {
-                  "defined": {
-                    "name": "PendingAction"
-                  }
-                },
+                "u16",
                 2
               ]
             }
           },
           {
-            "name": "turn",
-            "type": "u16"
+            "name": "base_hp",
+            "type": {
+              "array": [
+                "u32",
+                2
+              ]
+            }
           },
           {
-            "name": "deadline",
-            "docs": [
-              "Unix time by which both players must have submitted this turn's actions."
-            ],
-            "type": "i64"
+            "name": "base_power",
+            "type": {
+              "array": [
+                "u32",
+                2
+              ]
+            }
+          },
+          {
+            "name": "base_defense",
+            "type": {
+              "array": [
+                "u32",
+                2
+              ]
+            }
+          },
+          {
+            "name": "board",
+            "type": {
+              "defined": {
+                "name": "Combat"
+              }
+            }
           },
           {
             "name": "winner",
@@ -3364,6 +3648,154 @@
       }
     },
     {
+      "name": "Combat",
+      "docs": [
+        "The mutable state of a single turn-based fight between two monsters. Shared",
+        "by the quick pot-stake `Battle` and each game of an NFT-staked `Match`, so",
+        "the combat engine (see `combat.rs`) has one implementation.",
+        "",
+        "Per-side stats are the effective (level-scaled, trait-adjusted) values",
+        "computed by `combat_stats::fighter` when the two sides lock in."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hp",
+            "type": {
+              "array": [
+                "u32",
+                2
+              ]
+            }
+          },
+          {
+            "name": "max_hp",
+            "type": {
+              "array": [
+                "u32",
+                2
+              ]
+            }
+          },
+          {
+            "name": "power",
+            "type": {
+              "array": [
+                "u32",
+                2
+              ]
+            }
+          },
+          {
+            "name": "defense",
+            "type": {
+              "array": [
+                "u32",
+                2
+              ]
+            }
+          },
+          {
+            "name": "speed",
+            "docs": [
+              "Attack speed; the faster side lands its DPS first each turn."
+            ],
+            "type": {
+              "array": [
+                "u32",
+                2
+              ]
+            }
+          },
+          {
+            "name": "dmg_bonus_bps",
+            "docs": [
+              "Trait bonus to DPS damage vs the opponent, in basis points."
+            ],
+            "type": {
+              "array": [
+                "u16",
+                2
+              ]
+            }
+          },
+          {
+            "name": "defense_pierce_bps",
+            "docs": [
+              "Fraction of the opponent's defense ignored on DPS, in basis points."
+            ],
+            "type": {
+              "array": [
+                "u16",
+                2
+              ]
+            }
+          },
+          {
+            "name": "always_first",
+            "docs": [
+              "Strike-first override (UNIQUE trait vs lower rarity)."
+            ],
+            "type": {
+              "array": [
+                "bool",
+                2
+              ]
+            }
+          },
+          {
+            "name": "def_buff",
+            "docs": [
+              "Temporary defense buff from DEF actions."
+            ],
+            "type": {
+              "array": [
+                "u32",
+                2
+              ]
+            }
+          },
+          {
+            "name": "def_buff_turns",
+            "docs": [
+              "Turns the defense buff has left."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          },
+          {
+            "name": "pending",
+            "type": {
+              "array": [
+                {
+                  "defined": {
+                    "name": "PendingAction"
+                  }
+                },
+                2
+              ]
+            }
+          },
+          {
+            "name": "turn",
+            "type": "u16"
+          },
+          {
+            "name": "deadline",
+            "docs": [
+              "Unix time by which both players must have submitted this turn's actions."
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "GameConfig",
       "docs": [
         "Global game configuration. Single PDA, seeded by [CONFIG_SEED].",
@@ -3415,6 +3847,14 @@
               "Fee on marketplace sales (basis points), sent to `fee_wallet`."
             ],
             "type": "u16"
+          },
+          {
+            "name": "level_up_base_cost",
+            "docs": [
+              "Base MHM (micro-MHM) cost unit for leveling up a monster; the actual",
+              "cost scales by rarity and current level (see combat_stats::level_up_cost)."
+            ],
+            "type": "u64"
           },
           {
             "name": "monster_price_mhm",
@@ -3531,6 +3971,13 @@
               "Fee on marketplace sales, in basis points."
             ],
             "type": "u16"
+          },
+          {
+            "name": "level_up_base_cost",
+            "docs": [
+              "Base micro-MHM cost unit for leveling up (scaled by rarity + level)."
+            ],
+            "type": "u64"
           },
           {
             "name": "metadata_base_uri",
@@ -3684,6 +4131,13 @@
             }
           },
           {
+            "name": "level",
+            "docs": [
+              "Level (1..=MAX_LEVEL). Raises battle stats; leveled via `level_up`."
+            ],
+            "type": "u16"
+          },
+          {
             "name": "mining_rate",
             "docs": [
               "Mining speed in micro-MHM per hour."
@@ -3765,6 +4219,30 @@
           },
           {
             "name": "target_slot",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MonsterLeveledUp",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "monster",
+            "type": "pubkey"
+          },
+          {
+            "name": "holder",
+            "type": "pubkey"
+          },
+          {
+            "name": "level",
+            "type": "u16"
+          },
+          {
+            "name": "cost",
             "type": "u64"
           }
         ]
@@ -4007,6 +4485,12 @@
             "name": "market_fee_bps",
             "type": {
               "option": "u16"
+            }
+          },
+          {
+            "name": "level_up_base_cost",
+            "type": {
+              "option": "u64"
             }
           },
           {

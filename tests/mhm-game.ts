@@ -167,6 +167,7 @@ describe("mini-hungry-monsters", () => {
         burnBps: 7000, // 70% of monster purchases burned, 30% to fee wallet
         battleFeeBps: 250, // 2.5% rake on battle loot
         marketFeeBps: 200, // 2% marketplace fee
+        levelUpBaseCost: new BN(1_000_000),
         metadataBaseUri:
           "https://raw.githubusercontent.com/scorched-osu/MINI-HUNGRY-MONSTERS/main/assets/metadata/",
         monsterPriceMhm: new BN(100_000_000), // 100 MHM

@@ -145,6 +145,8 @@ select, input {
 
 .muted { color: var(--muted); font-size: 0.9rem; }
 
+button.level { background: #2a2f52; color: var(--gold); width: 100%; }
+
 @media (max-width: 700px) {
   .fighters { grid-template-columns: 1fr; }
 }

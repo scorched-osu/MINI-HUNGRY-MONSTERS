@@ -17,6 +17,8 @@
   "burnBps": 7000,
   "battleFeeBps": 250,
   "marketFeeBps": 200,
+  "levelUpBaseCost": 1000000,
+  "$levelUpComment": "Base micro-MHM cost unit (1 MHM). Level cost = base * rarityMult(1/2/4/8/16) * currentLevel. Cap 20. Standard maxes for ~190 MHM, Unique ~3040 MHM.",
   "metadataBaseUri": "https://raw.githubusercontent.com/scorched-osu/MINI-HUNGRY-MONSTERS/main/assets/metadata/",
   "monsterPriceMhm": 100000000,
   "genesisPriceLamports": 100000000,

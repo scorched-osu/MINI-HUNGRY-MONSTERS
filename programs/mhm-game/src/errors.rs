@@ -18,6 +18,8 @@ pub enum MhmError {
     MonsterNotInBattle,
     #[msg("Nothing to claim")]
     NothingToClaim,
+    #[msg("Monster is already at the maximum level")]
+    MaxLevelReached,
     #[msg("Battle is not open for joining")]
     BattleNotOpen,
     #[msg("Battle is not active")]

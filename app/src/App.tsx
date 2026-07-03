@@ -7,6 +7,9 @@ import { getAssociatedTokenAddressSync } from '@solana/spl-token'
 import {
   claimMining,
   createBattle,
+  levelUp,
+  levelUpCost,
+  MAX_LEVEL,
   fetchAllBattles,
   fetchAllListings,
   fetchAllMonsters,
@@ -26,6 +29,7 @@ import {
 import { MonsterCard } from './MonsterCard'
 import { Arena } from './Arena'
 import { Market } from './Market'
+import { RARITY_NAMES, rarityName } from './catalog'
 
 type Tab = 'monsters' | 'hatchery' | 'arena' | 'market'
 
@@ -151,19 +155,30 @@ export default function App() {
           {myMonsters.length === 0 && (
             <div className="card">No monsters yet — visit the Hatchery!</div>
           )}
-          {myMonsters.map((m) => (
-            <MonsterCard
-              key={m.publicKey.toBase58()}
-              monster={m}
-              busy={busy}
-              onClaim={() => run('Claiming MHM', () => claimMining(program!, wallet.publicKey!, m))}
-              onChallenge={
-                config
-                  ? () => run('Creating battle', () => createBattle(program!, wallet.publicKey!, config, m))
-                  : undefined
-              }
-            />
-          ))}
+          {myMonsters.map((m) => {
+            const rarityIdx = Math.max(0, RARITY_NAMES.indexOf(rarityName(m.account.rarity) as (typeof RARITY_NAMES)[number]))
+            const atMax = m.account.level >= MAX_LEVEL
+            return (
+              <MonsterCard
+                key={m.publicKey.toBase58()}
+                monster={m}
+                busy={busy}
+                atMaxLevel={atMax}
+                levelCost={config ? formatMhm(levelUpCost(config, rarityIdx, m.account.level)) : undefined}
+                onClaim={() => run('Claiming MHM', () => claimMining(program!, wallet.publicKey!, m))}
+                onLevelUp={
+                  config && !atMax
+                    ? () => run('Leveling up', () => levelUp(program!, wallet.publicKey!, config, m))
+                    : undefined
+                }
+                onChallenge={
+                  config
+                    ? () => run('Creating battle', () => createBattle(program!, wallet.publicKey!, config, m))
+                    : undefined
+                }
+              />
+            )
+          })}
         </section>
       )}
 

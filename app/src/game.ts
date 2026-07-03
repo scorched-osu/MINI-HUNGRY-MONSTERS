@@ -38,6 +38,7 @@ export interface GameConfig {
   burnBps: number
   battleFeeBps: number
   marketFeeBps: number
+  levelUpBaseCost: BN
   monsterPriceMhm: BN
   genesisPriceLamports: BN
   genesisRemaining: number
@@ -52,6 +53,7 @@ export interface Monster {
   mint: PublicKey
   id: BN
   rarity: Record<string, unknown>
+  level: number
   miningRate: BN
   lastSettledTs: BN
   unclaimed: BN
@@ -64,21 +66,34 @@ export interface Monster {
   battle: PublicKey
 }
 
+export interface Combat {
+  hp: number[]
+  maxHp: number[]
+  power: number[]
+  defense: number[]
+  speed: number[]
+  dmgBonusBps: number[]
+  defensePierceBps: number[]
+  alwaysFirst: boolean[]
+  defBuff: number[]
+  defBuffTurns: number[]
+  pending: { submitted: boolean; consumable: number; support: number }[]
+  turn: number
+  deadline: BN
+}
+
 export interface Battle {
   id: BN
   state: Record<string, unknown>
   players: PublicKey[]
   monsters: PublicKey[]
   pots: BN[]
-  hp: number[]
-  maxHp: number[]
-  power: number[]
-  defense: number[]
-  defBuff: number[]
-  defBuffTurns: number[]
-  pending: { submitted: boolean; consumable: number; support: number }[]
-  turn: number
-  deadline: BN
+  rarity: number[]
+  level: number[]
+  baseHp: number[]
+  basePower: number[]
+  baseDefense: number[]
+  board: Combat
   winner: number
 }
 
@@ -299,6 +314,40 @@ export async function claimMining(program: Program, holder: PublicKey, monster: 
       holderNftToken: getAssociatedTokenAddressSync(monster.account.mint, holder),
       mhmMint,
       holderMhmAta: getAssociatedTokenAddressSync(mhmMint, holder),
+      holder,
+      systemProgram: SystemProgram.programId,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+    })
+    .rpc()
+}
+
+export const MAX_LEVEL = 20
+const RARITY_MULT = [1, 2, 4, 8, 16]
+
+/** micro-MHM cost to go from `level` to `level+1` (mirror of on-chain calc). */
+export function levelUpCost(config: GameConfig, rarityIdx: number, level: number): BN {
+  if (level >= MAX_LEVEL) return new BN(0)
+  return config.levelUpBaseCost.muln(RARITY_MULT[rarityIdx] ?? 1).muln(level)
+}
+
+export async function levelUp(
+  program: Program,
+  holder: PublicKey,
+  config: GameConfig,
+  monster: Keyed<Monster>,
+) {
+  const mhmMint = mhmMintPda()
+  return program.methods
+    .levelUp()
+    .accounts({
+      config: configPda(),
+      monster: monster.publicKey,
+      holderNftToken: getAssociatedTokenAddressSync(monster.account.mint, holder),
+      mhmMint,
+      holderMhmAta: getAssociatedTokenAddressSync(mhmMint, holder),
+      feeWallet: config.feeWallet,
+      feeMhmAta: getAssociatedTokenAddressSync(mhmMint, config.feeWallet),
       holder,
       systemProgram: SystemProgram.programId,
       tokenProgram: TOKEN_PROGRAM_ID,

@@ -7,13 +7,19 @@ const EMOJI = ['👾', '🐙', '🐲', '🦖', '👹']
 export function MonsterCard({
   monster,
   busy,
+  levelCost,
+  atMaxLevel,
   onClaim,
   onChallenge,
+  onLevelUp,
 }: {
   monster: Keyed<Monster>
   busy: boolean
+  levelCost?: string
+  atMaxLevel?: boolean
   onClaim: () => void
   onChallenge?: () => void
+  onLevelUp?: () => void
 }) {
   const m = monster.account
   const rarity = rarityName(m.rarity)
@@ -32,7 +38,7 @@ export function MonsterCard({
       <div className="monster-head">
         <span className="monster-emoji">{EMOJI[rarityIdx]}</span>
         <div>
-          <h3>MHM #{m.id.toString()}</h3>
+          <h3>MHM #{m.id.toString()} · Lv{m.level}</h3>
           <span className={`rar rar${rarityIdx}`}>{rarity}</span>
         </div>
       </div>
@@ -44,6 +50,13 @@ export function MonsterCard({
           🏆 {m.wins}–{m.losses}
         </span>
       </div>
+      {onLevelUp && (
+        <div className="row">
+          <button className="level" disabled={busy || atMaxLevel} onClick={onLevelUp}>
+            {atMaxLevel ? 'Max level' : `Level up → Lv${m.level + 1} (${levelCost} MHM)`}
+          </button>
+        </div>
+      )}
       <div className="mining">
         <div className="rate">⛏️ {formatMhm(m.miningRate)} MHM/hr</div>
         <div className="pending">

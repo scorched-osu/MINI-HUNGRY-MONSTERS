@@ -52,12 +52,13 @@ function BattleRoom({
   busy: boolean
 }) {
   const b = battle.account
+  const board = b.board
   const now = useNow()
   const mySide = b.players.findIndex((p) => p.equals(me))
   const opp = mySide === 0 ? 1 : 0
-  const secondsLeft = Math.max(0, b.deadline.toNumber() - now)
-  const iSubmitted = mySide >= 0 && b.pending[mySide].submitted
-  const oppSubmitted = mySide >= 0 && b.pending[opp].submitted
+  const secondsLeft = Math.max(0, board.deadline.toNumber() - now)
+  const iSubmitted = mySide >= 0 && board.pending[mySide].submitted
+  const oppSubmitted = mySide >= 0 && board.pending[opp].submitted
 
   const [consumable, setConsumable] = useState<number>(1)
   const [support, setSupport] = useState<number>(NO_SUPPORT)
@@ -65,22 +66,23 @@ function BattleRoom({
   return (
     <div className="card battleroom">
       <h2>
-        ⚔️ Battle #{b.id.toString()} — turn {b.turn}
+        ⚔️ Battle #{b.id.toString()} — turn {board.turn}
       </h2>
       <div className="fighters">
         {[0, 1].map((side) => (
           <div key={side} className={`fighter ${side === mySide ? 'mine' : ''}`}>
             <h4>
-              {side === mySide ? 'YOUR MONSTER' : 'OPPONENT'}{' '}
-              {b.defBuff[side] > 0 && <span className="buff">🛡️+{b.defBuff[side]}</span>}
+              {side === mySide ? 'YOUR MONSTER' : 'OPPONENT'} · Lv{b.level[side]}{' '}
+              {board.defBuff[side] > 0 && <span className="buff">🛡️+{board.defBuff[side]}</span>}
             </h4>
-            <HpBar hp={b.hp[side]} maxHp={b.maxHp[side]} />
+            <HpBar hp={board.hp[side]} maxHp={board.maxHp[side]} />
             <div className="stats">
-              <span>⚔️ {b.power[side]}</span>
-              <span>🛡️ {b.defense[side]}</span>
-              <span>💰 {formatMhm(b.pots[side])} MHM at stake</span>
+              <span>⚔️ {board.power[side]}</span>
+              <span>🛡️ {board.defense[side]}</span>
+              <span>💨 {board.speed[side]}</span>
+              <span>💰 {formatMhm(b.pots[side])} MHM</span>
             </div>
-            <div className="submitted">{b.pending[side].submitted ? '✅ action locked in' : '…choosing'}</div>
+            <div className="submitted">{board.pending[side].submitted ? '✅ action locked in' : '…choosing'}</div>
           </div>
         ))}
       </div>
@@ -238,7 +240,7 @@ export function Arena({
             <div key={b.publicKey.toBase58()} className="row spread">
               <span>
                 Battle #{b.account.id.toString()} — pot {formatMhm(b.account.pots[0])} MHM —{' '}
-                ❤️{b.account.maxHp[0]} ⚔️{b.account.power[0]} 🛡️{b.account.defense[0]}
+                Lv{b.account.level[0]} ❤️{b.account.baseHp[0]} ⚔️{b.account.basePower[0]} 🛡️{b.account.baseDefense[0]}
               </span>
               {isMine ? (
                 <button disabled={busy} onClick={() => run('Cancelling', () => cancelBattle(program, me, b))}>
