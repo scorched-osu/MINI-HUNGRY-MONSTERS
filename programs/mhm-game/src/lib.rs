@@ -685,9 +685,11 @@ pub mod mhm_game {
     /// Open a Grudge Match: escrow your monster's NFT and stake it on a
     /// best-of-5. HIGHEST RISK — lose and your monster is gone for good.
     pub fn create_match(ctx: Context<CreateMatch>, match_id: u64) -> Result<()> {
+        let now = Clock::get()?.unix_timestamp;
         let config = &mut ctx.accounts.config;
         require!(!config.paused, MhmError::GamePaused);
         require!(match_id == config.battles_created, MhmError::Overflow);
+        require!(!ctx.accounts.monster.in_battle, MhmError::MonsterInBattle);
         config.battles_created += 1;
 
         // Escrow the challenger's NFT.
@@ -703,6 +705,7 @@ pub mod mhm_game {
             1,
         )?;
 
+        let gm_key = ctx.accounts.grudge_match.key();
         let m = &mut ctx.accounts.grudge_match;
         let monster = &ctx.accounts.monster;
         m.id = match_id;
@@ -718,20 +721,27 @@ pub mod mhm_game {
         m.games_played = 0;
         m.winner = NONE_U8;
         m.bump = ctx.bumps.grudge_match;
+        let monster_mint = monster.mint;
 
-        emit!(MatchCreated {
-            grudge_match: m.key(),
-            creator: m.players[0],
-            monster: monster.mint,
-        });
+        // Lock the monster in the same way pot-battles do, so it can't also be
+        // put into a pot-battle or listing while escrowed. Bank accrued mining
+        // first (it travels with the NFT to whoever wins).
+        let monster = &mut ctx.accounts.monster;
+        monster.settle(now);
+        monster.in_battle = true;
+        monster.battle = gm_key;
+
+        emit!(MatchCreated { grudge_match: gm_key, creator: ctx.accounts.creator.key(), monster: monster_mint });
         Ok(())
     }
 
     /// Accept a Grudge Match: escrow your NFT and start game 1.
     pub fn join_match(ctx: Context<JoinMatch>) -> Result<()> {
         let now = Clock::get()?.unix_timestamp;
+        let gm_key = ctx.accounts.grudge_match.key();
         let m = &mut ctx.accounts.grudge_match;
         require!(m.state == MatchState::Open, MhmError::MatchNotOpen);
+        require!(!ctx.accounts.monster.in_battle, MhmError::MonsterInBattle);
         let monster = &ctx.accounts.monster;
         require!(monster.mint != m.monsters[0], MhmError::CannotMatchSelf);
         require!(
@@ -769,12 +779,16 @@ pub mod mhm_game {
         );
         m.board = Combat::new(&f0, &f1, now + TURN_DEADLINE_SECS);
         m.state = MatchState::Active;
+        let joiner = m.players[1];
+        let monster_mint = m.monsters[1];
 
-        emit!(MatchJoined {
-            grudge_match: m.key(),
-            joiner: m.players[1],
-            monster: monster.mint,
-        });
+        // Lock the joiner's monster too.
+        let monster = &mut ctx.accounts.monster;
+        monster.settle(now);
+        monster.in_battle = true;
+        monster.battle = gm_key;
+
+        emit!(MatchJoined { grudge_match: gm_key, joiner, monster: monster_mint });
         Ok(())
     }
 
@@ -856,9 +870,14 @@ pub mod mhm_game {
 
     /// Cancel an unaccepted Grudge Match; the escrowed NFT returns to you.
     pub fn cancel_match(ctx: Context<CancelMatch>) -> Result<()> {
+        let now = Clock::get()?.unix_timestamp;
         let m = &ctx.accounts.grudge_match;
         require!(m.state == MatchState::Open, MhmError::MatchNotOpen);
         require!(m.players[0] == ctx.accounts.creator.key(), MhmError::NotMatchCreator);
+        require!(
+            ctx.accounts.monster.mint == m.monsters[0],
+            MhmError::MonsterNotInBattle
+        );
 
         let id = m.id;
         let bump = m.bump;
@@ -885,6 +904,12 @@ pub mod mhm_game {
             signer_seeds,
         ))?;
 
+        // Unlock the monster.
+        let monster = &mut ctx.accounts.monster;
+        monster.in_battle = false;
+        monster.battle = Pubkey::default();
+        monster.last_settled_ts = now;
+
         ctx.accounts.grudge_match.state = MatchState::Cancelled;
         Ok(())
     }
@@ -892,6 +917,7 @@ pub mod mhm_game {
     /// Pay out a finished Grudge Match: WINNER TAKES BOTH NFTs. On a drawn
     /// match each monster returns to its original owner. Permissionless crank.
     pub fn settle_match(ctx: Context<SettleMatch>) -> Result<()> {
+        let now = Clock::get()?.unix_timestamp;
         let m = &ctx.accounts.grudge_match;
         require!(m.state == MatchState::Finished, MhmError::MatchNotFinished);
 
@@ -944,15 +970,22 @@ pub mod mhm_game {
         }
 
         // Persist win/loss records on the monsters.
-        if m.winner == 0 || m.winner == 1 {
-            let winner_side = m.winner as usize;
-            if winner_side == 0 {
+        let winner = ctx.accounts.grudge_match.winner;
+        if winner == 0 || winner == 1 {
+            if winner == 0 {
                 ctx.accounts.monster_a.wins += 1;
                 ctx.accounts.monster_b.losses += 1;
             } else {
                 ctx.accounts.monster_b.wins += 1;
                 ctx.accounts.monster_a.losses += 1;
             }
+        }
+
+        // Unlock both monsters; mining resumes for their (new) owners.
+        for monster in [&mut ctx.accounts.monster_a, &mut ctx.accounts.monster_b] {
+            monster.in_battle = false;
+            monster.battle = Pubkey::default();
+            monster.last_settled_ts = now;
         }
 
         ctx.accounts.grudge_match.state = MatchState::Settled;
@@ -1770,6 +1803,7 @@ pub struct CreateMatch<'info> {
     pub monster_mint: Account<'info, Mint>,
 
     #[account(
+        mut,
         seeds = [MONSTER_SEED, monster_mint.key().as_ref()],
         bump = monster.bump
     )]
@@ -1806,6 +1840,7 @@ pub struct JoinMatch<'info> {
     pub monster_mint: Account<'info, Mint>,
 
     #[account(
+        mut,
         seeds = [MONSTER_SEED, monster_mint.key().as_ref()],
         bump = monster.bump
     )]
@@ -1855,6 +1890,13 @@ pub struct CancelMatch<'info> {
 
     #[account(address = grudge_match.monsters[0])]
     pub monster_mint: Account<'info, Mint>,
+
+    #[account(
+        mut,
+        seeds = [MONSTER_SEED, monster_mint.key().as_ref()],
+        bump = monster.bump
+    )]
+    pub monster: Account<'info, Monster>,
 
     #[account(
         mut,

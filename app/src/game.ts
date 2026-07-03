@@ -631,6 +631,7 @@ export async function cancelMatch(program: Program, creator: PublicKey, gm: Keye
     .accounts({
       grudgeMatch: gm.publicKey,
       monsterMint: mint,
+      monster: monsterPda(mint),
       escrowNftToken: getAssociatedTokenAddressSync(mint, gm.publicKey, true),
       creatorNftToken: getAssociatedTokenAddressSync(mint, creator),
       creator,

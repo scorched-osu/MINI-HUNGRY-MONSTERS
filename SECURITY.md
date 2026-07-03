@@ -43,6 +43,13 @@ explicitly checked and found sound:
 (`program_data.upgrade_authority_address == admin`), closing the deploy-time
 window where an attacker could otherwise call it first and seize admin.
 
+The NFT-staked Grudge Match escrow/settle path was reviewed: escrow accounts
+are owned by the match PDA and only released under its seeds; `settle_match`
+validates each destination against the winner (or, on a draw, the original
+owner) so a permissionless crank cannot redirect an NFT. A monster staked in a
+match is locked with the same `in_battle` flag as a pot-battle (and its NFT is
+escrowed), so it cannot be simultaneously entered into a pot-battle or listed.
+
 ## Randomness
 
 Hatching uses **commit–reveal**: `commit_*` takes payment and pins

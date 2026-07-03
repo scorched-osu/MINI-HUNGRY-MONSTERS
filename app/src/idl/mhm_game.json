@@ -1073,6 +1073,30 @@
           "name": "monster_mint"
         },
         {
+          "name": "monster",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  111,
+                  110,
+                  115,
+                  116,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "monster_mint"
+              }
+            ]
+          }
+        },
+        {
           "name": "escrow_nft_token",
           "writable": true,
           "pda": {
@@ -2140,6 +2164,7 @@
         },
         {
           "name": "monster",
+          "writable": true,
           "pda": {
             "seeds": [
               {
@@ -2462,6 +2487,7 @@
         },
         {
           "name": "monster",
+          "writable": true,
           "pda": {
             "seeds": [
               {
